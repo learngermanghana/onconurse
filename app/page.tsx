@@ -2,7 +2,6 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   formatPrice,
-  getSedifexBlogPosts,
   getSedifexEvents,
   getSedifexHeroSlides,
   getSedifexServices,
@@ -10,6 +9,7 @@ import {
   serviceHref,
   whatsappLink,
 } from "../lib/sedifex-public";
+import { getSedifexBlogPosts } from "../lib/sedifex-blog";
 import { site } from "../lib/site";
 
 export default async function HomePage() {
@@ -343,7 +343,6 @@ export default async function HomePage() {
           ))}
         </div>
       </section>
-
     </>
   );
 }
