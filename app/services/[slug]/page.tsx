@@ -2,9 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   formatPrice,
-  getSedifexServices,
-  getServiceSlug,
-  slugify,
+  getSedifexService,
   whatsappLink,
 } from "../../../lib/sedifex";
 import { site } from "../../../lib/site";
@@ -15,13 +13,7 @@ export default async function SingleServicePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const services = await getSedifexServices();
-  const service = services.find(
-    (item) =>
-      getServiceSlug(item) === slug ||
-      item.id === slug ||
-      slugify(item.name) === slug
-  );
+  const service = await getSedifexService(slug);
 
   if (!service) notFound();
 

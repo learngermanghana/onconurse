@@ -10,7 +10,7 @@ import {
   serviceHref,
   whatsappLink,
 } from "../lib/sedifex";
-import { programs, site } from "../lib/site";
+import { site } from "../lib/site";
 
 export default async function HomePage() {
   const [slides, services, social, posts, events] = await Promise.all([
@@ -99,19 +99,18 @@ export default async function HomePage() {
             <div className="absolute -left-8 -top-8 h-40 w-40 rounded-full bg-emerald-300/40 blur-3xl" />
             <div className="absolute -bottom-8 -right-8 h-40 w-40 rounded-full bg-amber-300/40 blur-3xl" />
 
-            <div className="relative overflow-hidden rounded-[2.5rem] border-8 border-white bg-slate-200 shadow-2xl">
+            <div className="relative h-[420px] overflow-hidden rounded-[2.5rem] border-8 border-white bg-gradient-to-br from-emerald-50 via-white to-amber-50 shadow-2xl md:h-[560px]">
               {heroImageUrl ? (
                 <Image
                   src={heroImageUrl}
                   alt="Onco-nurse Germany nursing guidance"
-                  width={900}
-                  height={1080}
+                  fill
                   sizes="(min-width: 768px) 50vw, 100vw"
                   priority
-                  className="h-[540px] w-full object-cover"
+                  className="object-contain p-2"
                 />
               ) : (
-                <div className="flex h-[540px] flex-col items-center justify-center bg-gradient-to-br from-emerald-700 via-emerald-900 to-slate-950 p-10 text-center text-white">
+                <div className="flex h-full flex-col items-center justify-center bg-gradient-to-br from-emerald-700 via-emerald-900 to-slate-950 p-10 text-center text-white">
                   <div className="text-7xl">🩺</div>
                   <p className="mt-6 text-4xl font-black">Onco-nurse</p>
                   <p className="mt-3 text-lg font-bold text-emerald-100">
@@ -254,12 +253,17 @@ export default async function HomePage() {
                   <strong>Location:</strong>{" "}
                   {event.location || "Online / to be confirmed"}
                 </p>
+                {typeof event.availableSlots === "number" ? (
+                  <p>
+                    <strong>Available slots:</strong> {event.availableSlots}
+                  </p>
+                ) : null}
               </div>
 
               <Link
                 href={
                   event.ctaHref ||
-                  `/book?serviceId=${encodeURIComponent(event.id)}&serviceName=${encodeURIComponent(event.title)}`
+                  `/book?serviceId=${encodeURIComponent(event.serviceId || event.id)}&serviceName=${encodeURIComponent(event.serviceName || event.title)}`
                 }
                 className="mt-6 inline-flex rounded-full bg-emerald-700 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-800"
               >
@@ -340,37 +344,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="bg-white">
-        <div className="section">
-          <span className="badge">Pathways</span>
-
-          <h2 className="section-title mt-4">
-            Germany pathways we explain clearly
-          </h2>
-
-          <div className="mt-10 grid gap-6 md:grid-cols-3">
-            {programs.map((program) => (
-              <Link
-                key={program.slug}
-                href={`/programs/${program.slug}`}
-                className="rounded-3xl border border-slate-200 bg-slate-50 p-7 transition hover:-translate-y-1 hover:border-emerald-600 hover:bg-white hover:shadow-xl"
-              >
-                <p className="text-xs font-black uppercase tracking-widest text-emerald-700">
-                  {program.eyebrow}
-                </p>
-
-                <h3 className="mt-3 text-2xl font-black text-slate-950">
-                  {program.title}
-                </h3>
-
-                <p className="mt-3 text-sm leading-6 text-slate-600">
-                  {program.summary}
-                </p>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
     </>
   );
 }

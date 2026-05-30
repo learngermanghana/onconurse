@@ -131,6 +131,9 @@ export type SedifexEvent = {
   status?: string;
   ctaLabel?: string;
   ctaHref?: string;
+  serviceId?: string;
+  serviceName?: string;
+  availableSlots?: number;
 };
 
 export type SedifexProfile = {
@@ -325,6 +328,13 @@ type SedifexPublicCatalogResponse = {
   items?: unknown[];
 };
 
+type SedifexItemResponse = {
+  item?: unknown;
+  product?: unknown;
+  service?: unknown;
+  data?: unknown;
+};
+
 const preferredServiceNames = [
   "nursing ausbildung",
   "fsj",
@@ -449,6 +459,41 @@ function mapSedifexItem(raw: unknown, index: number): SedifexService {
   };
 }
 
+function serviceItemFromPayload(payload: unknown): unknown | null {
+  if (!isRecord(payload)) return null;
+
+  const response = payload as SedifexItemResponse;
+  return response.item || response.service || response.product || response.data || payload;
+}
+
+async function getSedifexServiceItemByLookup(
+  lookup: string,
+  lookupKey: "slug" | "itemId"
+) {
+  const endpoints = [
+    "/v1IntegrationItem",
+    "/v1IntegrationItems",
+    "/v1IntegrationProduct",
+    "/publicQuickPayItem",
+  ];
+
+  for (const endpoint of endpoints) {
+    const publicEndpoint = endpoint.startsWith("/public");
+    const payload = await sedifexGet<unknown>(
+      endpoint,
+      { [lookupKey]: lookup },
+      30,
+      true,
+      !publicEndpoint
+    );
+    const item = serviceItemFromPayload(payload);
+
+    if (item && isServiceItem(item)) return mapSedifexItem(item, 0);
+  }
+
+  return null;
+}
+
 function preferredServiceIndex(service: SedifexService) {
   const searchable = `${service.name} ${service.category || ""}`.toLowerCase();
   const index = preferredServiceNames.findIndex((name) => searchable.includes(name));
@@ -513,6 +558,24 @@ export async function getSedifexServices(): Promise<SedifexService[]> {
 
 export const getServiceData = getSedifexServices;
 
+export async function getSedifexService(slug: string): Promise<SedifexService | null> {
+  const serviceFromSlug = await getSedifexServiceItemByLookup(slug, "slug");
+  if (serviceFromSlug) return serviceFromSlug;
+
+  const serviceFromItemId = await getSedifexServiceItemByLookup(slug, "itemId");
+  if (serviceFromItemId) return serviceFromItemId;
+
+  const services = await getSedifexServices();
+  return (
+    services.find(
+      (item) =>
+        getServiceSlug(item) === slug ||
+        item.id === slug ||
+        slugify(item.name) === slug
+    ) || null
+  );
+}
+
 export async function getSedifexHeroSlides(): Promise<SedifexHeroSlide[]> {
   const payload = await sedifexGet<{ slides?: SedifexHeroSlide[] }>(
     "/v1IntegrationHeroSlides",
@@ -553,6 +616,12 @@ function pickArray(payload: unknown): unknown[] {
   if (!isRecord(payload)) return [];
 
   const keys = [
+    "availability",
+    "availabilities",
+    "availableSlots",
+    "slots",
+    "appointments",
+    "bookableSlots",
     "events",
     "upcomingEvents",
     "calendarEvents",
@@ -608,19 +677,34 @@ const fallbackEvents: SedifexEvent[] = [
 
 function normalizeEvent(raw: unknown, index: number): SedifexEvent {
   const record = isRecord(raw) ? raw : {};
-  const title = readString(
-    record,
-    ["title", "name", "heading"],
-    `Event ${index + 1}`
-  );
+  const service = isRecord(record.service) ? record.service : {};
+  const item = isRecord(record.item) ? record.item : {};
+  const title =
+    readString(record, ["title", "name", "heading", "label"]) ||
+    readString(service, ["title", "name", "serviceName"]) ||
+    readString(item, ["title", "name", "serviceName"], `Event ${index + 1}`);
+  const serviceId =
+    readString(record, ["serviceId", "itemId", "productId"]) ||
+    readString(service, ["id", "serviceId", "itemId"]) ||
+    readString(item, ["id", "serviceId", "itemId"]);
+  const serviceName =
+    readString(record, ["serviceName", "itemName", "productName"]) ||
+    readString(service, ["name", "serviceName", "title"]) ||
+    readString(item, ["name", "serviceName", "title"]);
 
   return {
-    id: readString(record, ["id", "eventId", "slug"], `event-${index + 1}`),
+    id: readString(
+      record,
+      ["id", "eventId", "availabilityId", "slotId", "slug"],
+      serviceId || `event-${index + 1}`
+    ),
     slug: readString(record, ["slug"]) || undefined,
     title,
-    category: readString(record, ["category", "type", "badge"]) || undefined,
+    category: readString(record, ["category", "type", "badge"], "Upcoming Event") || undefined,
     description:
-      readString(record, ["description", "excerpt", "summary", "subtitle"]) ||
+      readString(record, ["description", "excerpt", "summary", "subtitle", "notes"]) ||
+      readString(service, ["description", "summary"]) ||
+      readString(item, ["description", "summary"]) ||
       undefined,
     imageUrl:
       readString(record, [
@@ -628,16 +712,27 @@ function normalizeEvent(raw: unknown, index: number): SedifexEvent {
         "coverImageUrl",
         "bannerImageUrl",
         "image",
+      ]) || readString(service, ["imageUrl", "image"]) || readString(item, ["imageUrl", "image"]) || undefined,
+    startDate:
+      readString(record, [
+        "startDate",
+        "date",
+        "eventDate",
+        "availableDate",
+        "slotDate",
+        "startsAt",
+        "startAt",
       ]) || undefined,
-    startDate: readString(record, ["startDate", "date", "eventDate"]) || undefined,
-    endDate: readString(record, ["endDate"]) || undefined,
-    startTime: readString(record, ["startTime", "time"]) || undefined,
+    endDate: readString(record, ["endDate", "endsAt", "endAt"]) || undefined,
+    startTime: readString(record, ["startTime", "time", "availableTime", "slotTime"]) || undefined,
     endTime: readString(record, ["endTime"]) || undefined,
-    location: readString(record, ["location", "venue"]) || undefined,
-    status: readString(record, ["status"]) || undefined,
-    ctaLabel: readString(record, ["ctaLabel", "buttonText"]) || undefined,
-    ctaHref:
-      readString(record, ["ctaHref", "buttonLink", "url"]) || undefined,
+    location: readString(record, ["location", "venue", "timezone"], "Online / to be confirmed") || undefined,
+    status: readString(record, ["status", "availabilityStatus"]) || undefined,
+    ctaLabel: readString(record, ["ctaLabel", "buttonText"], "Register Interest") || undefined,
+    ctaHref: readString(record, ["ctaHref", "buttonLink", "url"]) || undefined,
+    serviceId: serviceId || undefined,
+    serviceName: serviceName || title,
+    availableSlots: readNumber(record, ["availableSlots", "availableCount", "capacity", "stockCount"]),
   };
 }
 
@@ -665,8 +760,28 @@ function isEventPromo(raw: unknown, event: SedifexEvent) {
   return /event|webinar|workshop|seminar|session|info session/.test(marker);
 }
 
+function sortEventsByDate(events: SedifexEvent[]) {
+  return [...events].sort((left, right) => {
+    const leftTime = Date.parse(`${left.startDate || ""} ${left.startTime || ""}`.trim());
+    const rightTime = Date.parse(`${right.startDate || ""} ${right.startTime || ""}`.trim());
+
+    if (Number.isFinite(leftTime) || Number.isFinite(rightTime)) {
+      return (Number.isFinite(leftTime) ? leftTime : Number.POSITIVE_INFINITY) -
+        (Number.isFinite(rightTime) ? rightTime : Number.POSITIVE_INFINITY);
+    }
+
+    return 0;
+  });
+}
+
 export async function getSedifexEvents(): Promise<SedifexEvent[]> {
   const endpoints = [
+    "/v1IntegrationAvailability",
+    "/v1IntegrationAvailabilities",
+    "/v1IntegrationAvailableSlots",
+    "/publicAvailability",
+    "/publicAvailabilities",
+    "/publicAvailableSlots",
     "/v1IntegrationEvents",
     "/v1IntegrationUpcomingEvents",
     "/v1IntegrationCalendarEvents",
@@ -674,7 +789,13 @@ export async function getSedifexEvents(): Promise<SedifexEvent[]> {
   ];
 
   for (const endpoint of endpoints) {
-    const payload = await sedifexGet<unknown>(endpoint, {}, 60, true);
+    const payload = await sedifexGet<unknown>(
+      endpoint,
+      {},
+      60,
+      true,
+      !endpoint.startsWith("/public")
+    );
     const items = pickArray(payload);
     const events = items
       .map(normalizeEvent)
@@ -683,7 +804,7 @@ export async function getSedifexEvents(): Promise<SedifexEvent[]> {
         return endpoint !== "/v1IntegrationPromo" || isEventPromo(items[index], event);
       });
 
-    if (events.length) return events;
+    if (events.length) return sortEventsByDate(events);
   }
 
   return fallbackEvents.map(normalizeEvent);
@@ -787,7 +908,13 @@ export async function getSedifexBlogPosts(): Promise<SedifexBlogPost[]> {
   ];
 
   for (const endpoint of endpoints) {
-    const payload = await sedifexGet<unknown>(endpoint, {}, 60, true);
+    const payload = await sedifexGet<unknown>(
+      endpoint,
+      {},
+      60,
+      true,
+      !endpoint.startsWith("/public")
+    );
     const items = pickArray(payload);
 
     if (items.length) {

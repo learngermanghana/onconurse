@@ -50,9 +50,8 @@ function Header({ social }: { social: SedifexSocialSettings | null }) {
         <nav className="flex flex-wrap items-center gap-4 text-sm font-semibold text-slate-700 md:gap-6">
           <Link href="/">Home</Link>
           <Link href="/services">Services</Link>
-          <Link href="/programs">Programs</Link>
           <Link href="/blog">Blog</Link>
-          <Link href="/events">Events</Link>
+          <Link href="/events">Upcoming Events</Link>
           <Link href="/about">About</Link>
           <Link href="/contact">Contact</Link>
         </nav>
@@ -114,9 +113,8 @@ function Footer({ social }: { social: SedifexSocialSettings | null }) {
           <p className="font-bold">Pages</p>
           <div className="mt-4 grid gap-2 text-sm text-slate-300">
             <Link href="/services">Services</Link>
-            <Link href="/programs">Programs</Link>
             <Link href="/blog">Blog</Link>
-            <Link href="/events">Events</Link>
+            <Link href="/events">Upcoming Events</Link>
             <a href={site.mailingListUrl} target="_blank" rel="noreferrer">
               Join Mailing List
             </a>
