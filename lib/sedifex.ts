@@ -5,10 +5,21 @@ const SEDIFEX_BASE_URL =
   process.env.SEDIFEX_API_BASE_URL ||
   "https://us-central1-sedifex-web.cloudfunctions.net";
 
+const SEDIFEX_PUBLIC_BLOG_URL =
+  process.env.SEDIFEX_PUBLIC_BLOG_URL ||
+  process.env.NEXT_PUBLIC_SEDIFEX_PUBLIC_BLOG_URL ||
+  "https://www.sedifex.com/api/public-blog";
+
 const SEDIFEX_STORE_ID =
   process.env.SEDIFEX_STORE_ID ||
   process.env.SEDIFEX_BOOKING_TARGET_STORE_ID ||
   "";
+
+const SEDIFEX_PUBLIC_BLOG_STORE_ID =
+  process.env.SEDIFEX_PUBLIC_BLOG_STORE_ID ||
+  process.env.NEXT_PUBLIC_SEDIFEX_PUBLIC_BLOG_STORE_ID ||
+  process.env.SEDIFEX_STORE_ID ||
+  "YvRddOFEYlhYoNrwqSyHwShPioR2";
 
 const SEDIFEX_API_KEY =
   process.env.SEDIFEX_INTEGRATION_API_KEY ||
@@ -45,7 +56,9 @@ export type SedifexBlogPost = {
   category?: string;
   excerpt?: string;
   content?: string;
+  contentHtml?: string;
   imageUrl?: string;
+  imageAlt?: string;
   publishedAt?: string;
   updatedAt?: string;
   author?: string;
@@ -179,6 +192,52 @@ async function sedifexGet<T>(
   }
 
   return response.json();
+}
+
+async function sedifexPublicBlogGet<T>(
+  params: Record<string, string> = {},
+  revalidate = 60,
+  silentErrors = true
+): Promise<T | null> {
+  if (!hasUsableValue(SEDIFEX_PUBLIC_BLOG_STORE_ID)) return null;
+
+  const url = new URL(SEDIFEX_PUBLIC_BLOG_URL);
+  if (!url.searchParams.has("storeId")) {
+    url.searchParams.set("storeId", SEDIFEX_PUBLIC_BLOG_STORE_ID);
+  }
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value) url.searchParams.set(key, value);
+  });
+
+  try {
+    const response = await fetch(url, {
+      headers: { Accept: "application/json" },
+      next: { revalidate },
+    });
+
+    if (!response.ok) {
+      if (!silentErrors) {
+        console.error("Sedifex public blog GET failed", {
+          url: url.toString(),
+          status: response.status,
+          requestId: response.headers.get("x-sedifex-request-id"),
+        });
+      }
+      return null;
+    }
+
+    return response.json();
+  } catch (error) {
+    if (!silentErrors) {
+      console.error("Sedifex public blog GET failed", {
+        url: url.toString(),
+        error,
+      });
+    }
+
+    return null;
+  }
 }
 
 async function sedifexPost<T>(path: string, body: unknown): Promise<T> {
@@ -444,13 +503,20 @@ function normalizeBlogPost(raw: unknown, index: number): SedifexBlogPost {
     "shortDescription",
   ]);
 
+  const contentHtml = readString(record, ["contentHtml", "html"]);
   const content =
-    readString(record, ["content", "body", "article", "longDescription", "html"]) ||
+    readString(record, ["content", "body", "article", "longDescription"]) ||
+    contentHtml ||
     excerpt;
+  const postSlug = readString(record, ["slug", "postSlug"], slugify(title));
 
   return {
-    id: readString(record, ["id", "postId", "slug"], `blog-${index + 1}`),
-    slug: readString(record, ["slug"], slugify(title)),
+    id: readString(
+      record,
+      ["id", "postId", "slug", "postSlug"],
+      postSlug || `blog-${index + 1}`
+    ),
+    slug: postSlug,
     title,
     category: readString(
       record,
@@ -459,19 +525,50 @@ function normalizeBlogPost(raw: unknown, index: number): SedifexBlogPost {
     ),
     excerpt,
     content,
+    contentHtml,
     imageUrl: readString(record, [
       "imageUrl",
       "coverImageUrl",
       "bannerImageUrl",
       "image",
     ]),
+    imageAlt: readString(record, ["imageAlt", "coverImageAlt", "alt"], title),
     publishedAt: readString(record, ["publishedAt", "createdAt", "updatedAt"]),
     updatedAt: readString(record, ["updatedAt"]) || undefined,
     author: readString(record, ["author", "authorName"], "Onco-nurse"),
   };
 }
 
+export function sanitizeSedifexHtml(html: string) {
+  return html
+    .replace(
+      /<\/?(?:script|style|iframe|object|embed|form|input|button|textarea|select|option|link|meta|base)[^>]*>/gi,
+      ""
+    )
+    .replace(/\s+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/\s+(?:srcdoc|formaction)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/\s+(href|src)\s*=\s*(["'])\s*javascript:[^"']*\2/gi, "")
+    .replace(/<a\b([^>]*)>/gi, (match, attrs: string) => {
+      if (/\srel\s*=/.test(attrs)) return match;
+      return `<a${attrs} rel="noopener noreferrer">`;
+    });
+}
+
+async function getSedifexPublicBlogPosts(
+  limit = "20"
+): Promise<SedifexBlogPost[]> {
+  const publicPayload = await sedifexPublicBlogGet<unknown>({ limit }, 60);
+
+  return pickArray(publicPayload)
+    .map(normalizeBlogPost)
+    .filter((post) => post.title && post.slug);
+}
+
 export async function getSedifexBlogPosts(): Promise<SedifexBlogPost[]> {
+  const publicPosts = await getSedifexPublicBlogPosts();
+
+  if (publicPosts.length) return publicPosts;
+
   const endpoints = [
     "/v1IntegrationBlogPosts",
     "/v1IntegrationBlogs",
@@ -489,6 +586,16 @@ export async function getSedifexBlogPosts(): Promise<SedifexBlogPost[]> {
   }
 
   return fallbackBlogPosts.map(normalizeBlogPost);
+}
+
+export async function getSedifexBlogPost(slug: string): Promise<SedifexBlogPost | null> {
+  const publicPosts = await getSedifexPublicBlogPosts("100");
+  const publicPost = publicPosts.find((item) => item.slug === slug);
+
+  if (publicPost) return publicPost;
+
+  const posts = await getSedifexBlogPosts();
+  return posts.find((item) => item.slug === slug) || null;
 }
 
 export async function createSedifexBooking(input: {
