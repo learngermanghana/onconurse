@@ -2,6 +2,19 @@ import Link from "next/link";
 import Image from "next/image";
 import { getSedifexBlogPosts } from "../../lib/sedifex";
 
+function formatDisplayDate(value?: string) {
+  if (!value) return "";
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
 export default async function BlogPage() {
   const posts = await getSedifexBlogPosts();
 
@@ -24,47 +37,58 @@ export default async function BlogPage() {
 
       <section className="section">
         <div className="grid gap-6 md:grid-cols-3">
-          {posts.map((post) => (
-            <Link
-              key={post.id}
-              href={`/blog/${post.slug}`}
-              className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
-            >
-              <div className="relative aspect-[16/10] bg-gradient-to-br from-emerald-100 via-white to-amber-100">
-                {post.imageUrl ? (
-                  <Image
-                    src={post.imageUrl}
-                    alt={post.title}
-                    fill
-                    sizes="(min-width: 768px) 33vw, 100vw"
-                    className="object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center px-6 text-center text-2xl font-black text-emerald-800">
-                    {post.category || "Germany Guide"}
+          {posts.map((post) => {
+            const publishedAt = formatDisplayDate(post.publishedAt);
+
+            return (
+              <Link
+                key={post.id}
+                href={`/blog/${post.slug}`}
+                className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
+              >
+                <div className="relative aspect-[16/10] bg-gradient-to-br from-emerald-100 via-white to-amber-100">
+                  {post.imageUrl ? (
+                    <Image
+                      src={post.imageUrl}
+                      alt={post.imageAlt || post.title}
+                      fill
+                      sizes="(min-width: 768px) 33vw, 100vw"
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center px-6 text-center text-2xl font-black text-emerald-800">
+                      {post.category || "Germany Guide"}
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-6">
+                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-emerald-700">
+                    {post.category || "Blog"}
+                  </span>
+
+                  <h2 className="mt-4 text-xl font-black text-slate-950">
+                    {post.title}
+                  </h2>
+
+                  <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">
+                    {post.excerpt}
+                  </p>
+
+                  <div className="mt-6 flex items-center justify-between gap-4 text-sm">
+                    {publishedAt && (
+                      <time className="font-bold text-slate-500">
+                        {publishedAt}
+                      </time>
+                    )}
+                    <span className="font-black text-emerald-700">
+                      Read article →
+                    </span>
                   </div>
-                )}
-              </div>
-
-              <div className="p-6">
-                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-emerald-700">
-                  {post.category || "Blog"}
-                </span>
-
-                <h2 className="mt-4 text-xl font-black text-slate-950">
-                  {post.title}
-                </h2>
-
-                <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">
-                  {post.excerpt}
-                </p>
-
-                <p className="mt-6 text-sm font-black text-emerald-700">
-                  Read article →
-                </p>
-              </div>
-            </Link>
-          ))}
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </section>
     </>
