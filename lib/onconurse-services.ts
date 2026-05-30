@@ -143,13 +143,14 @@ function firstPayloadItem(payload: unknown): unknown | null {
     payload.product ||
     payload.publicProduct ||
     payload.publicService ||
+    payload.listing ||
     payload.data ||
     payload.content;
 
   if (direct && !Array.isArray(direct)) return direct;
   if (readString(payload, ["name", "title"])) return payload;
 
-  for (const key of ["items", "products", "services", "publicProducts", "publicServices"]) {
+  for (const key of ["items", "products", "services", "publicProducts", "publicServices", "listings"]) {
     const value = payload[key];
     if (Array.isArray(value) && value[0]) return value[0];
   }
@@ -202,36 +203,71 @@ function normalizeService(raw: unknown, index: number): SedifexService | null {
   };
 }
 
-function knownProductAttempts(productId: string): ProductAttempt[] {
+function productLookupParams(productId: string) {
   return [
-    {
-      baseUrl: SEDIFEX_BASE_URL,
-      path: "/v1IntegrationItem",
-      params: { storeId: SEDIFEX_STORE_ID, itemId: productId },
-      authenticated: true,
-    },
-    {
-      baseUrl: SEDIFEX_BASE_URL,
-      path: "/v1IntegrationProduct",
-      params: { storeId: SEDIFEX_STORE_ID, itemId: productId },
-      authenticated: true,
-    },
-    {
-      baseUrl: SEDIFEX_BASE_URL,
-      path: "/publicQuickPayItem",
-      params: { storeId: SEDIFEX_STORE_ID, itemId: productId },
-    },
-    {
-      baseUrl: SEDIFEX_PUBLIC_API_BASE_URL,
-      path: `/api/public/products/${encodeURIComponent(productId)}`,
-      params: { storeId: SEDIFEX_STORE_ID, storeSlug: SEDIFEX_STORE_SLUG },
-    },
-    {
-      baseUrl: SEDIFEX_PUBLIC_API_BASE_URL,
-      path: "/api/public/products",
-      params: { storeId: SEDIFEX_STORE_ID, storeSlug: SEDIFEX_STORE_SLUG, itemId: productId },
-    },
+    { itemId: productId },
+    { productId },
+    { publicListingId: productId },
+    { sourceProductId: productId },
+    { listingId: productId },
+    { id: productId },
   ];
+}
+
+function knownProductAttempts(productId: string): ProductAttempt[] {
+  const attempts: ProductAttempt[] = [];
+  const functionPaths = [
+    "/v1IntegrationItem",
+    "/v1IntegrationItems",
+    "/v1IntegrationProduct",
+    "/v1IntegrationProducts",
+  ];
+  const publicFunctionPaths = ["/publicQuickPayItem", "/publicQuickPayCatalog"];
+
+  for (const path of functionPaths) {
+    for (const params of productLookupParams(productId)) {
+      attempts.push({
+        baseUrl: SEDIFEX_BASE_URL,
+        path,
+        params: { storeId: SEDIFEX_STORE_ID, ...params },
+        authenticated: true,
+      });
+    }
+  }
+
+  for (const path of publicFunctionPaths) {
+    for (const params of productLookupParams(productId)) {
+      attempts.push({
+        baseUrl: SEDIFEX_BASE_URL,
+        path,
+        params: { storeId: SEDIFEX_STORE_ID, ...params },
+      });
+    }
+  }
+
+  for (const path of [
+    `/api/public/products/${encodeURIComponent(productId)}`,
+    `/api/public/services/${encodeURIComponent(productId)}`,
+    `/api/public/catalog/${encodeURIComponent(productId)}`,
+  ]) {
+    attempts.push({
+      baseUrl: SEDIFEX_PUBLIC_API_BASE_URL,
+      path,
+      params: { storeId: SEDIFEX_STORE_ID, storeSlug: SEDIFEX_STORE_SLUG },
+    });
+  }
+
+  for (const path of ["/api/public/products", "/api/public/services", "/api/public/catalog"]) {
+    for (const params of productLookupParams(productId)) {
+      attempts.push({
+        baseUrl: SEDIFEX_PUBLIC_API_BASE_URL,
+        path,
+        params: { storeId: SEDIFEX_STORE_ID, storeSlug: SEDIFEX_STORE_SLUG, ...params },
+      });
+    }
+  }
+
+  return attempts;
 }
 
 async function getKnownProductServices() {
@@ -264,7 +300,8 @@ export async function getOncoNurseServices() {
   const knownProducts = await getKnownProductServices();
   if (knownProducts.length) return knownProducts;
 
-  return getSedifexServices();
+  const services = await getSedifexServices();
+  return services.filter((service) => !service.id.startsWith("local-"));
 }
 
 export async function getOncoNurseService(slug: string) {
