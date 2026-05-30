@@ -1,8 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
-import { getSedifexEvents } from "../../lib/sedifex-public";
+import { getOncoNurseEvents } from "../../lib/onconurse-events";
+import { formatPrice } from "../../lib/sedifex-public";
 
-function formatDisplayDate(value?: string) {
+function formatDisplayDate(value?: string, displayText?: string) {
+  if (displayText) return displayText;
   if (!value) return "Date to be announced";
   const date = new Date(value);
 
@@ -16,7 +18,8 @@ function formatDisplayDate(value?: string) {
   }).format(date);
 }
 
-function formatDisplayTime(start?: string, end?: string) {
+function formatDisplayTime(start?: string, end?: string, displayText?: string) {
+  if (displayText) return displayText;
   if (!start && !end) return "Time to be announced";
   if (start && end) return `${start} – ${end}`;
   return start || end || "Time to be announced";
@@ -46,7 +49,7 @@ function displayTimezone(value?: string) {
 }
 
 export default async function EventsPage() {
-  const events = await getSedifexEvents();
+  const events = await getOncoNurseEvents();
 
   return (
     <>
@@ -71,8 +74,8 @@ export default async function EventsPage() {
             <span className="badge">Sedifex Schedule</span>
             <h2 className="section-title mt-4">Available Sessions</h2>
             <p className="section-subtitle">
-              Dates, times and available slots are pulled from Sedifex when
-              available.
+              Manual upcoming events, images, dates, times and seats are pulled
+              from Sedifex availability slots.
             </p>
           </div>
 
@@ -84,33 +87,39 @@ export default async function EventsPage() {
         {events.length ? (
           <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {events.map((event) => {
+              const serviceId = event.serviceId || `manual:${event.id}`;
               const href =
                 event.ctaHref ||
-                `/book?serviceId=${encodeURIComponent(event.serviceId || event.id)}&serviceName=${encodeURIComponent(event.serviceName || event.title)}`;
+                `/book?serviceId=${encodeURIComponent(serviceId)}&serviceName=${encodeURIComponent(event.serviceName || event.title)}&slotId=${encodeURIComponent(event.slotId || event.id)}&bookingDate=${encodeURIComponent(event.startDate || "")}&bookingTime=${encodeURIComponent(event.startTime || event.displayTimeText || "Time to be announced")}&scheduleStatus=${encodeURIComponent(event.scheduleStatus || "")}&paymentAmount=${encodeURIComponent(String(event.paymentAmount || event.price || 0))}`;
               const label = event.ctaLabel || "Register Interest";
-              const date = formatDisplayDate(event.startDate);
-              const time = formatDisplayTime(event.startTime, event.endTime);
+              const date = formatDisplayDate(event.startDate, event.displayDateText);
+              const time = formatDisplayTime(event.startTime, event.endTime, event.displayTimeText);
               const slots = availableSlotsText(event.availableSlots);
               const location = displayLocation(event.location);
               const timezone = displayTimezone(event.location);
               const isFull = typeof event.availableSlots === "number" && event.availableSlots <= 0;
+              const imageAlt = event.imageAlt || event.serviceName || event.title || "Upcoming event";
 
               return (
                 <article
                   key={`${event.id}-${event.startDate || ""}-${event.startTime || ""}`}
                   className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
                 >
-                  {event.imageUrl ? (
-                    <div className="relative aspect-[16/10] bg-gradient-to-br from-emerald-100 via-white to-amber-100">
+                  <div className="relative aspect-[16/10] bg-gradient-to-br from-emerald-100 via-white to-amber-100">
+                    {event.imageUrl ? (
                       <Image
                         src={event.imageUrl}
-                        alt={event.title}
+                        alt={imageAlt}
                         fill
                         sizes="(min-width: 1280px) 33vw, (min-width: 768px) 50vw, 100vw"
                         className="object-cover"
                       />
-                    </div>
-                  ) : null}
+                    ) : (
+                      <div className="flex h-full items-center justify-center px-6 text-center text-5xl font-black text-emerald-800">
+                        {(event.serviceName || event.title || "E").slice(0, 1)}
+                      </div>
+                    )}
+                  </div>
 
                   <div className="p-7">
                     <div className="flex flex-wrap items-center gap-2">
@@ -163,6 +172,17 @@ export default async function EventsPage() {
                         </p>
                         <p className="mt-1 font-bold text-slate-900">{location}</p>
                       </div>
+
+                      {event.paymentAmount || event.price ? (
+                        <div>
+                          <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+                            Fee
+                          </p>
+                          <p className="mt-1 font-bold text-slate-900">
+                            {formatPrice(event.paymentAmount || event.price)}
+                          </p>
+                        </div>
+                      ) : null}
                     </div>
 
                     <Link
