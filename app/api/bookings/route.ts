@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { createSedifexBooking } from "../../../lib/sedifex";
+import {
+  createSedifexBookingCheckout,
+  getSedifexCheckoutReturnUrl,
+} from "../../../lib/sedifex";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -79,7 +82,21 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await createSedifexBooking({
+    const paymentAmount = getNumber(body, "paymentAmount") ?? 0;
+
+    if (paymentAmount <= 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "This service needs a Sedifex price before checkout can be created.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const requestUrl = new URL(request.url);
+    const result = await createSedifexBookingCheckout({
       serviceId: getString(body, "serviceId") || "onco-nurse-consultation",
       serviceName: getString(body, "serviceName") || "Onco-nurse Consultation",
       bookingDate,
@@ -95,9 +112,11 @@ export async function POST(request: Request) {
       ]
         .filter(Boolean)
         .join("\n"),
-      paymentMethod: "manual",
-      paymentAmount: getNumber(body, "paymentAmount"),
+      paymentAmount,
       sourceChannel: "client_website",
+      returnUrl: getSedifexCheckoutReturnUrl(
+        new URL("/payment/return", requestUrl.origin).toString()
+      ),
       attributes: {
         source: "website_booking_form",
         sourceLabel: "Onco-nurse website",

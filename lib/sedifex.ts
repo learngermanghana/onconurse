@@ -5,16 +5,17 @@ const DEFAULT_SEDIFEX_API_BASE_URL =
 
 function getSedifexConfig() {
   const storeId =
-    process.env.SEDIFEX_STORE_ID ||
     process.env.SEDIFEX_BOOKING_TARGET_STORE_ID ||
+    process.env.SEDIFEX_STORE_ID ||
     process.env.NEXT_PUBLIC_SEDIFEX_STORE_ID ||
     "";
 
   const apiKey =
-    process.env.SEDIFEX_INTEGRATION_API_KEY ||
-    process.env.SEDIFEX_PRODUCTS_API_KEY ||
     process.env.SEDIFEX_BOOKING_API_KEY ||
+    process.env.SEDIFEX_CHECKOUT_API_KEY ||
+    process.env.SEDIFEX_INTEGRATION_API_KEY ||
     process.env.SEDIFEX_INTEGRATION_KEY ||
+    process.env.SEDIFEX_PRODUCTS_API_KEY ||
     "";
 
   return {
@@ -22,14 +23,24 @@ function getSedifexConfig() {
       process.env.SEDIFEX_INTEGRATION_API_BASE_URL ||
       process.env.SEDIFEX_API_BASE_URL ||
       DEFAULT_SEDIFEX_API_BASE_URL,
+    checkoutCreateUrl:
+      process.env.SEDIFEX_INTEGRATION_CHECKOUT_CREATE_URL ||
+      `${process.env.SEDIFEX_INTEGRATION_API_BASE_URL || process.env.SEDIFEX_API_BASE_URL || DEFAULT_SEDIFEX_API_BASE_URL}/integrationCheckoutCreate`,
     storeId,
     apiKey,
+    checkoutApiKey:
+      process.env.SEDIFEX_CHECKOUT_API_KEY ||
+      process.env.SEDIFEX_BOOKING_API_KEY ||
+      process.env.SEDIFEX_INTEGRATION_API_KEY ||
+      process.env.SEDIFEX_INTEGRATION_KEY ||
+      "",
     contractVersion: process.env.SEDIFEX_CONTRACT_VERSION || "2026-04-13",
   };
 }
 
 const SEDIFEX_CONFIG = getSedifexConfig();
 const SEDIFEX_BASE_URL = SEDIFEX_CONFIG.baseUrl;
+const SEDIFEX_CHECKOUT_CREATE_URL = SEDIFEX_CONFIG.checkoutCreateUrl;
 
 const SEDIFEX_PUBLIC_API_BASE_URL =
   process.env.SEDIFEX_PUBLIC_API_BASE_URL ||
@@ -45,6 +56,7 @@ const SEDIFEX_STORE_SLUG =
   slugify(site.name);
 
 const SEDIFEX_API_KEY = SEDIFEX_CONFIG.apiKey;
+const SEDIFEX_CHECKOUT_API_KEY = SEDIFEX_CONFIG.checkoutApiKey;
 
 const SEDIFEX_CONTRACT_VERSION = SEDIFEX_CONFIG.contractVersion;
 
@@ -169,10 +181,14 @@ export function isSedifexConfigured() {
   return isSedifexStoreConfigured() && hasUsableValue(SEDIFEX_API_KEY);
 }
 
-function sedifexHeaders(contentType = false) {
+export function isSedifexCheckoutConfigured() {
+  return isSedifexStoreConfigured() && hasUsableValue(SEDIFEX_CHECKOUT_API_KEY);
+}
+
+function sedifexHeaders(contentType = false, apiKey = SEDIFEX_API_KEY) {
   return {
-    "x-api-key": SEDIFEX_API_KEY,
-    Authorization: `Bearer ${SEDIFEX_API_KEY}`,
+    "x-api-key": apiKey,
+    Authorization: `Bearer ${apiKey}`,
     "X-Sedifex-Contract-Version": SEDIFEX_CONTRACT_VERSION,
     Accept: "application/json",
     ...(contentType ? { "Content-Type": "application/json" } : {}),
@@ -256,8 +272,21 @@ async function sedifexPublicBlogGet<T>(
   }
 }
 
-async function sedifexPost<T>(path: string, body: unknown): Promise<T> {
-  if (!isSedifexConfigured()) {
+async function sedifexPost<T>(
+  pathOrUrl: string,
+  body: unknown,
+  options: {
+    apiKey?: string;
+    includeStoreIdQuery?: boolean;
+    requireCheckoutKey?: boolean;
+  } = {}
+): Promise<T> {
+  const apiKey = options.apiKey || SEDIFEX_API_KEY;
+  const configured = options.requireCheckoutKey
+    ? isSedifexStoreConfigured() && hasUsableValue(apiKey)
+    : isSedifexStoreConfigured() && hasUsableValue(apiKey);
+
+  if (!configured) {
     return {
       ok: true,
       demoMode: true,
@@ -267,12 +296,14 @@ async function sedifexPost<T>(path: string, body: unknown): Promise<T> {
     } as T;
   }
 
-  const url = new URL(path, SEDIFEX_BASE_URL);
-  url.searchParams.set("storeId", SEDIFEX_STORE_ID);
+  const url = new URL(pathOrUrl, SEDIFEX_BASE_URL);
+  if (options.includeStoreIdQuery !== false) {
+    url.searchParams.set("storeId", SEDIFEX_STORE_ID);
+  }
 
   const response = await fetch(url, {
     method: "POST",
-    headers: sedifexHeaders(true),
+    headers: sedifexHeaders(true, apiKey),
     body: JSON.stringify(body),
   });
 
@@ -784,7 +815,7 @@ export async function getSedifexBlogPost(slug: string): Promise<SedifexBlogPost 
   return posts.find((item) => item.slug === slug) || null;
 }
 
-export async function createSedifexBooking(input: {
+export type SedifexBookingInput = {
   serviceId: string;
   serviceName?: string;
   bookingDate?: string;
@@ -799,8 +830,61 @@ export async function createSedifexBooking(input: {
   paymentMethod?: string;
   paymentAmount?: number;
   sourceChannel?: string;
+  bookingStatus?: string;
+  paymentCollectionMode?: string;
+  paymentStatus?: string;
+  syncStatus?: string;
+  syncRequestedAt?: string;
   attributes?: Record<string, unknown>;
-}) {
+};
+
+type SedifexCheckoutInput = SedifexBookingInput & {
+  currency?: string;
+  returnUrl: string;
+};
+
+type SedifexCheckoutResponse = {
+  ok?: boolean;
+  demoMode?: boolean;
+  booking?: unknown;
+  checkout?: unknown;
+  bookingId?: string;
+  clientOrderId?: string;
+  checkoutUrl?: string;
+  authorizationUrl?: string;
+  reference?: string;
+  message?: string;
+};
+
+function readDeepString(value: unknown, keys: string[]): string {
+  if (!isRecord(value)) return "";
+
+  for (const key of keys) {
+    const field = value[key];
+    if (typeof field === "string" && field.trim()) return field.trim();
+    if (typeof field === "number" && Number.isFinite(field)) return String(field);
+  }
+
+  for (const nestedKey of ["data", "booking", "checkout", "order", "result"]) {
+    const nested: unknown = value[nestedKey];
+    if (nested && nested !== value) {
+      const found = readDeepString(nested, keys);
+      if (found) return found;
+    }
+  }
+
+  return "";
+}
+
+export function getSedifexStoreId() {
+  return SEDIFEX_STORE_ID;
+}
+
+export function getSedifexCheckoutReturnUrl(fallbackUrl: string) {
+  return process.env.SEDIFEX_CHECKOUT_RETURN_URL || fallbackUrl;
+}
+
+export async function createSedifexBooking(input: SedifexBookingInput) {
   return sedifexPost("/v1IntegrationBookings", {
     ...input,
     quantity: input.quantity || 1,
@@ -814,6 +898,117 @@ export async function createSedifexBooking(input: {
       ...input.attributes,
     },
   });
+}
+
+export async function createSedifexBookingCheckout(
+  input: SedifexCheckoutInput
+): Promise<SedifexCheckoutResponse> {
+  const storeId = getSedifexStoreId();
+  const quantity = input.quantity || 1;
+  const amount = input.paymentAmount || 0;
+  const currency = input.currency || "GHS";
+  const booking = await createSedifexBooking({
+    ...input,
+    quantity,
+    paymentMethod: input.paymentMethod || "paystack_checkout",
+    bookingStatus: input.bookingStatus || "booked",
+    paymentCollectionMode: input.paymentCollectionMode || "online_checkout",
+    paymentStatus: input.paymentStatus || "checkout_created",
+    syncStatus: input.syncStatus || "pending",
+    syncRequestedAt: input.syncRequestedAt || new Date().toISOString(),
+    attributes: {
+      ...input.attributes,
+      source: "website_booking_form",
+      channel: "client-website",
+      orderType: "service",
+      selectedBranchStoreId:
+        (input.attributes?.selectedBranchStoreId as string | undefined) || storeId,
+      selectedBranchServiceId:
+        (input.attributes?.selectedBranchServiceId as string | undefined) ||
+        input.serviceId,
+    },
+  });
+
+  if (isRecord(booking) && booking.demoMode) {
+    return {
+      ok: true,
+      demoMode: true,
+      booking,
+      bookingId: readDeepString(booking, ["bookingId", "id", "reference"]),
+      reference: readDeepString(booking, ["reference", "bookingId", "id"]),
+      message:
+        "Demo booking received. Add Sedifex booking and checkout keys to redirect to payment.",
+    };
+  }
+
+  const bookingId =
+    readDeepString(booking, ["bookingId", "id", "reference"]) ||
+    `bk_${Date.now()}`;
+  const clientOrderId = `BOOKING-${bookingId}`;
+  const checkout = await sedifexPost<unknown>(
+    SEDIFEX_CHECKOUT_CREATE_URL,
+    {
+      storeId,
+      merchantId: storeId,
+      clientOrderId,
+      orderType: "service",
+      sourceChannel: "client_website",
+      sourceLabel: "Client Website",
+      currency,
+      amount,
+      customer: input.customer,
+      items: [
+        {
+          id: input.serviceId,
+          item_id: input.serviceId,
+          serviceId: input.serviceId,
+          name: input.serviceName || "Onco-nurse Consultation",
+          serviceName: input.serviceName || "Onco-nurse Consultation",
+          unitPrice: amount,
+          price: amount,
+          qty: quantity,
+          quantity,
+          type: "SERVICE",
+          item_type: "service",
+        },
+      ],
+      returnUrl: input.returnUrl,
+      metadata: {
+        bookingId,
+        clientOrderId,
+        channel: "client-website",
+      },
+    },
+    {
+      apiKey: SEDIFEX_CHECKOUT_API_KEY,
+      includeStoreIdQuery: false,
+      requireCheckoutKey: true,
+    }
+  );
+
+  const checkoutUrl = readDeepString(checkout, [
+    "authorizationUrl",
+    "checkoutUrl",
+    "url",
+    "paymentUrl",
+  ]);
+  const reference = readDeepString(checkout, [
+    "reference",
+    "orderId",
+    "sedifexOrderId",
+    "id",
+  ]);
+
+  return {
+    ok: true,
+    booking,
+    checkout,
+    bookingId,
+    clientOrderId,
+    checkoutUrl,
+    authorizationUrl: checkoutUrl,
+    reference: reference || bookingId,
+  };
 }
 
 export function getServiceSlug(service: Pick<SedifexService, "id" | "name" | "slug">) {
