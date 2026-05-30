@@ -1,18 +1,21 @@
-﻿import Link from "next/link";
+import Link from "next/link";
+import Image from "next/image";
 import type { SedifexService } from "../lib/sedifex";
-import { formatPrice, slugify } from "../lib/sedifex";
+import { formatPrice, serviceHref } from "../lib/sedifex";
 
 export default function ServiceCard({ service }: { service: SedifexService }) {
-  const href = `/services/${slugify(service.name)}`;
+  const href = serviceHref(service);
 
   return (
     <article className="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
-      <div className="aspect-[16/10] bg-gradient-to-br from-emerald-100 via-white to-amber-100">
+      <div className="relative aspect-[16/10] bg-gradient-to-br from-emerald-100 via-white to-amber-100">
         {service.imageUrl ? (
-          <img
+          <Image
             src={service.imageUrl}
             alt={service.imageAlt || service.name}
-            className="h-full w-full object-cover"
+            fill
+            sizes="(min-width: 768px) 33vw, 100vw"
+            className="object-cover"
           />
         ) : (
           <div className="flex h-full items-center justify-center px-6 text-center text-2xl font-black text-emerald-800">

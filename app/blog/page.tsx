@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { getSedifexBlogPosts } from "../../lib/sedifex";
 
 export default async function BlogPage() {
@@ -29,12 +30,14 @@ export default async function BlogPage() {
               href={`/blog/${post.slug}`}
               className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
             >
-              <div className="aspect-[16/10] bg-gradient-to-br from-emerald-100 via-white to-amber-100">
+              <div className="relative aspect-[16/10] bg-gradient-to-br from-emerald-100 via-white to-amber-100">
                 {post.imageUrl ? (
-                  <img
+                  <Image
                     src={post.imageUrl}
                     alt={post.title}
-                    className="h-full w-full object-cover"
+                    fill
+                    sizes="(min-width: 768px) 33vw, 100vw"
+                    className="object-cover"
                   />
                 ) : (
                   <div className="flex h-full items-center justify-center px-6 text-center text-2xl font-black text-emerald-800">

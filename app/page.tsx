@@ -1,11 +1,12 @@
 import Link from "next/link";
+import Image from "next/image";
 import {
   formatPrice,
   getSedifexBlogPosts,
   getSedifexHeroSlides,
   getSedifexServices,
   getSedifexSocialSettings,
-  slugify,
+  serviceHref,
   whatsappLink,
 } from "../lib/sedifex";
 import { programs, site } from "../lib/site";
@@ -20,6 +21,7 @@ export default async function HomePage() {
 
   const hero = slides[0];
   const profile = social?.profile;
+  const heroImageUrl = hero?.imageUrl || profile?.coverImageUrl || "";
 
   const whatsapp = whatsappLink(
     profile?.whatsappNumber || site.whatsapp,
@@ -82,10 +84,14 @@ export default async function HomePage() {
             <div className="absolute -bottom-8 -right-8 h-40 w-40 rounded-full bg-amber-300/40 blur-3xl" />
 
             <div className="relative overflow-hidden rounded-[2.5rem] border-8 border-white bg-slate-200 shadow-2xl">
-              {hero?.imageUrl || profile?.coverImageUrl ? (
-                <img
-                  src={hero?.imageUrl || profile?.coverImageUrl}
+              {heroImageUrl ? (
+                <Image
+                  src={heroImageUrl}
                   alt="Onco-nurse Germany nursing guidance"
+                  width={900}
+                  height={1080}
+                  sizes="(min-width: 768px) 50vw, 100vw"
+                  priority
                   className="h-[540px] w-full object-cover"
                 />
               ) : (
@@ -135,12 +141,14 @@ export default async function HomePage() {
               href={`/blog/${post.slug}`}
               className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
             >
-              <div className="aspect-[16/10] bg-gradient-to-br from-emerald-100 via-white to-amber-100">
+              <div className="relative aspect-[16/10] bg-gradient-to-br from-emerald-100 via-white to-amber-100">
                 {post.imageUrl ? (
-                  <img
+                  <Image
                     src={post.imageUrl}
                     alt={post.title}
-                    className="h-full w-full object-cover"
+                    fill
+                    sizes="(min-width: 768px) 33vw, 100vw"
+                    className="object-cover"
                   />
                 ) : (
                   <div className="flex h-full items-center justify-center px-6 text-center text-2xl font-black text-emerald-800">
@@ -194,12 +202,14 @@ export default async function HomePage() {
               key={service.id}
               className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
             >
-              <div className="aspect-[16/10] bg-gradient-to-br from-emerald-100 via-white to-amber-100">
+              <div className="relative aspect-[16/10] bg-gradient-to-br from-emerald-100 via-white to-amber-100">
                 {service.imageUrl ? (
-                  <img
+                  <Image
                     src={service.imageUrl}
                     alt={service.imageAlt || service.name}
-                    className="h-full w-full object-cover"
+                    fill
+                    sizes="(min-width: 768px) 33vw, 100vw"
+                    className="object-cover"
                   />
                 ) : (
                   <div className="flex h-full items-center justify-center px-6 text-center text-2xl font-black text-emerald-800">
@@ -227,7 +237,7 @@ export default async function HomePage() {
                   </span>
 
                   <Link
-                    href={`/services/${slugify(service.name)}`}
+                    href={serviceHref(service)}
                     className="rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700"
                   >
                     View
