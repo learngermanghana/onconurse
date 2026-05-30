@@ -7,6 +7,7 @@ export const site = {
   phone: "+233000000000",
   email: "hello@onconurse.com",
   whatsapp: "+233000000000",
+  mailingListUrl: "https://sedifex.com/join-customers/f2c9f4ae391d41caa9431b9e",
 };
 
 export const fallbackServices = [

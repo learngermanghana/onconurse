@@ -55,6 +55,15 @@ export default async function HomePage() {
               </Link>
 
               <a
+                href={site.mailingListUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="btn-secondary"
+              >
+                Join our mailing list
+              </a>
+
+              <a
                 href={whatsapp}
                 target="_blank"
                 rel="noreferrer"

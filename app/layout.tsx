@@ -39,12 +39,23 @@ function Header() {
           <Link href="/contact">Contact</Link>
         </nav>
 
-        <Link
-          href="/book"
-          className="rounded-full bg-emerald-700 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-800"
-        >
-          Book Consultation
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <a
+            href={site.mailingListUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-full border border-emerald-700 px-5 py-3 text-sm font-bold text-emerald-700 shadow-sm hover:bg-emerald-50"
+          >
+            Join Mailing List
+          </a>
+
+          <Link
+            href="/book"
+            className="rounded-full bg-emerald-700 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-800"
+          >
+            Book Consultation
+          </Link>
+        </div>
       </div>
     </header>
   );
@@ -69,6 +80,9 @@ function Footer() {
             <Link href="/programs">Programs</Link>
             <Link href="/blog">Blog</Link>
             <Link href="/events">Events</Link>
+            <a href={site.mailingListUrl} target="_blank" rel="noreferrer">
+              Join Mailing List
+            </a>
             <Link href="/book">Book Consultation</Link>
           </div>
         </div>
