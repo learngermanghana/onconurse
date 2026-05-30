@@ -1,4 +1,4 @@
-import { fallbackBlogPosts, site } from "./site";
+import { fallbackBlogPosts } from "./site";
 import {
   getSedifexBlogPost as getLegacySedifexBlogPost,
   getSedifexBlogPosts as getLegacySedifexBlogPosts,
@@ -11,6 +11,7 @@ export { sanitizeSedifexHtml };
 
 const DEFAULT_SEDIFEX_API_BASE_URL =
   "https://us-central1-sedifex-web.cloudfunctions.net";
+const ONCO_NURSE_STORE_ID = "YvRddOFEYlhYoNrwqSyHwShPioR2";
 
 const SEDIFEX_BASE_URL =
   process.env.SEDIFEX_INTEGRATION_API_BASE_URL ||
@@ -20,19 +21,13 @@ const SEDIFEX_BASE_URL =
 const SEDIFEX_PUBLIC_API_BASE_URL =
   process.env.SEDIFEX_PUBLIC_API_BASE_URL ||
   process.env.NEXT_PUBLIC_SEDIFEX_PUBLIC_API_BASE_URL ||
-  "https://sedifex.com";
+  "https://www.sedifex.com";
 
 const SEDIFEX_STORE_ID =
   process.env.SEDIFEX_BOOKING_TARGET_STORE_ID ||
   process.env.SEDIFEX_STORE_ID ||
   process.env.NEXT_PUBLIC_SEDIFEX_STORE_ID ||
-  "";
-
-const SEDIFEX_STORE_SLUG =
-  process.env.SEDIFEX_STORE_SLUG ||
-  process.env.SEDIFEX_PUBLIC_STORE_SLUG ||
-  process.env.NEXT_PUBLIC_SEDIFEX_STORE_SLUG ||
-  slugify(site.name);
+  ONCO_NURSE_STORE_ID;
 
 const SEDIFEX_API_KEY =
   process.env.SEDIFEX_BOOKING_API_KEY ||
@@ -80,6 +75,23 @@ function readString(record: RecordValue, keys: string[], fallback = ""): string 
 
 function normalizedKey(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function plainText(value: string): string {
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/__(.*?)__/g, "$1")
+    .replace(/\[(.*?)\]\((.*?)\)/g, "$1")
+    .replace(/[#*_`>~-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function makeExcerpt(value: string, length = 160): string {
+  const text = plainText(value);
+  if (text.length <= length) return text;
+  return `${text.slice(0, length).trim()}…`;
 }
 
 function objectLooksLikeBlogPost(value: unknown): boolean {
@@ -138,8 +150,6 @@ function collectBlogLikeObjects(payload: unknown, depth = 0, seen = new WeakSet<
       "articles",
       "guides",
       "items",
-      "promos",
-      "banners",
       "data",
       "content",
       "results",
@@ -189,16 +199,6 @@ function normalizeBlogPost(raw: unknown, index: number): SedifexBlogPost {
     `Blog post ${index + 1}`
   );
 
-  const excerpt = readString(record, [
-    "excerpt",
-    "summary",
-    "subtitle",
-    "description",
-    "shortDescription",
-    "short_description",
-    "intro",
-  ]);
-
   const contentHtml = readString(record, [
     "contentHtml",
     "content_html",
@@ -221,9 +221,20 @@ function normalizeBlogPost(raw: unknown, index: number): SedifexBlogPost {
       "details",
       "text",
       "message",
-    ]) ||
-    contentHtml ||
-    excerpt;
+    ]) || contentHtml;
+
+  const excerpt =
+    readString(record, [
+      "excerpt",
+      "summary",
+      "subtitle",
+      "description",
+      "shortDescription",
+      "short_description",
+      "intro",
+      "metaDescription",
+      "meta_description",
+    ]) || makeExcerpt(content);
 
   const postSlug = readString(
     record,
@@ -254,6 +265,8 @@ function normalizeBlogPost(raw: unknown, index: number): SedifexBlogPost {
       "thumbnail_url",
       "photoUrl",
       "photo_url",
+      "ogImage",
+      "og_image",
       "image",
       "cover",
       "thumbnail",
@@ -339,6 +352,7 @@ function normalizePostsFromPayload(payload: unknown, promo = false): SedifexBlog
 
 function blogListAttempts(): BlogAttempt[] {
   return [
+    { baseUrl: SEDIFEX_PUBLIC_API_BASE_URL, path: "/api/public-blog", params: { storeId: SEDIFEX_STORE_ID, limit: "30" } },
     { baseUrl: SEDIFEX_BASE_URL, path: "/v1IntegrationBlogPosts", params: { storeId: SEDIFEX_STORE_ID, limit: "30" }, authenticated: true },
     { baseUrl: SEDIFEX_BASE_URL, path: "/v1IntegrationBlogs", params: { storeId: SEDIFEX_STORE_ID, limit: "30" }, authenticated: true },
     { baseUrl: SEDIFEX_BASE_URL, path: "/v1IntegrationPosts", params: { storeId: SEDIFEX_STORE_ID, limit: "30" }, authenticated: true },
@@ -346,9 +360,9 @@ function blogListAttempts(): BlogAttempt[] {
     { baseUrl: SEDIFEX_BASE_URL, path: "/v1IntegrationPromo", params: { storeId: SEDIFEX_STORE_ID, type: "blog", limit: "30" }, authenticated: true, promo: true },
     { baseUrl: SEDIFEX_BASE_URL, path: "/publicBlogPosts", params: { storeId: SEDIFEX_STORE_ID, limit: "30" } },
     { baseUrl: SEDIFEX_BASE_URL, path: "/publicBlogs", params: { storeId: SEDIFEX_STORE_ID, limit: "30" } },
-    { baseUrl: SEDIFEX_PUBLIC_API_BASE_URL, path: "/api/public/blog", params: { storeSlug: SEDIFEX_STORE_SLUG, storeId: SEDIFEX_STORE_ID, limit: "30" } },
-    { baseUrl: SEDIFEX_PUBLIC_API_BASE_URL, path: "/api/public/posts", params: { storeSlug: SEDIFEX_STORE_SLUG, storeId: SEDIFEX_STORE_ID, limit: "30" } },
-    { baseUrl: SEDIFEX_PUBLIC_API_BASE_URL, path: "/api/public/articles", params: { storeSlug: SEDIFEX_STORE_SLUG, storeId: SEDIFEX_STORE_ID, limit: "30" } },
+    { baseUrl: SEDIFEX_PUBLIC_API_BASE_URL, path: "/api/public/blog", params: { storeId: SEDIFEX_STORE_ID, limit: "30" } },
+    { baseUrl: SEDIFEX_PUBLIC_API_BASE_URL, path: "/api/public/posts", params: { storeId: SEDIFEX_STORE_ID, limit: "30" } },
+    { baseUrl: SEDIFEX_PUBLIC_API_BASE_URL, path: "/api/public/articles", params: { storeId: SEDIFEX_STORE_ID, limit: "30" } },
   ];
 }
 
@@ -363,30 +377,7 @@ export async function getSedifexBlogPosts(): Promise<SedifexBlogPost[]> {
   return legacy.length ? legacy : fallbackBlogPosts.map(normalizeBlogPost);
 }
 
-function firstBlogObject(payload: unknown): unknown | null {
-  const objects = collectBlogLikeObjects(payload);
-  return objects[0] || null;
-}
-
 export async function getSedifexBlogPost(slug: string): Promise<SedifexBlogPost | null> {
-  const attempts: BlogAttempt[] = [
-    { baseUrl: SEDIFEX_BASE_URL, path: "/v1IntegrationBlogPost", params: { storeId: SEDIFEX_STORE_ID, slug }, authenticated: true },
-    { baseUrl: SEDIFEX_BASE_URL, path: "/v1IntegrationBlogPosts", params: { storeId: SEDIFEX_STORE_ID, slug }, authenticated: true },
-    { baseUrl: SEDIFEX_BASE_URL, path: "/v1IntegrationBlogs", params: { storeId: SEDIFEX_STORE_ID, slug }, authenticated: true },
-    { baseUrl: SEDIFEX_BASE_URL, path: "/v1IntegrationContent", params: { storeId: SEDIFEX_STORE_ID, type: "blog", slug }, authenticated: true },
-    { baseUrl: SEDIFEX_PUBLIC_API_BASE_URL, path: `/api/public/blog/${encodeURIComponent(slug)}`, params: { storeSlug: SEDIFEX_STORE_SLUG, storeId: SEDIFEX_STORE_ID } },
-    { baseUrl: SEDIFEX_PUBLIC_API_BASE_URL, path: `/api/public/posts/${encodeURIComponent(slug)}`, params: { storeSlug: SEDIFEX_STORE_SLUG, storeId: SEDIFEX_STORE_ID } },
-  ];
-
-  for (const attempt of attempts) {
-    const payload = await fetchSedifexBlog(attempt);
-    const item = firstBlogObject(payload);
-    if (!item) continue;
-
-    const post = normalizeBlogPost(item, 0);
-    if (post.title && post.slug) return post;
-  }
-
   const posts = await getSedifexBlogPosts();
   const match = posts.find((post) => post.slug === slug || post.id === slug || slugify(post.title) === slug);
   if (match) return match;
