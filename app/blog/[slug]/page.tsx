@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
@@ -21,6 +22,58 @@ function formatDisplayDate(value?: string) {
     month: "long",
     year: "numeric",
   }).format(date);
+}
+
+function renderInlineMarkdown(value: string): ReactNode[] {
+  return value.split(/(\*\*[^*]+\*\*)/g).map((part, index) => {
+    const strongMatch = part.match(/^\*\*(.+)\*\*$/);
+
+    if (strongMatch) {
+      return (
+        <strong key={`${part}-${index}`} className="font-black text-slate-950">
+          {strongMatch[1]}
+        </strong>
+      );
+    }
+
+    return part;
+  });
+}
+
+function renderFormattedTextContent(value: string) {
+  return value
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.replace(/\s*\n\s*/g, " ").trim())
+    .filter(Boolean)
+    .map((paragraph, index) => {
+      const sectionMatch = paragraph.match(/^\*\*(.+?)\*\*\s*(.*)$/s);
+
+      if (sectionMatch) {
+        const [, heading, body] = sectionMatch;
+
+        return (
+          <section
+            key={`${heading}-${index}`}
+            className="rounded-3xl border border-emerald-100 bg-emerald-50/40 p-6"
+          >
+            <h2 className="text-2xl font-black tracking-tight text-emerald-950">
+              {heading}
+            </h2>
+            {body && (
+              <p className="mt-3 text-lg leading-9 text-slate-700">
+                {renderInlineMarkdown(body)}
+              </p>
+            )}
+          </section>
+        );
+      }
+
+      return (
+        <p key={`${paragraph}-${index}`} className="text-lg leading-9 text-slate-700">
+          {renderInlineMarkdown(paragraph)}
+        </p>
+      );
+    });
 }
 
 type BlogDetailsProps = {
@@ -110,10 +163,8 @@ export default async function BlogDetailsPage({ params }: BlogDetailsProps) {
             dangerouslySetInnerHTML={{ __html: htmlContent }}
           />
         ) : (
-          <div className="space-y-6 text-lg leading-9 text-slate-700">
-            {textContent.split(/\n{2,}/).map((paragraph) => (
-              <p key={paragraph}>{paragraph}</p>
-            ))}
+          <div className="space-y-6">
+            {renderFormattedTextContent(textContent)}
           </div>
         )}
 
