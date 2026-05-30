@@ -9,7 +9,7 @@ import {
   getSedifexSocialSettings,
   serviceHref,
   whatsappLink,
-} from "../lib/sedifex";
+} from "../lib/sedifex-public";
 import { site } from "../lib/site";
 
 export default async function HomePage() {
