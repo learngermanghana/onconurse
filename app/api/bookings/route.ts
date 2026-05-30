@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  createSedifexBooking,
   createSedifexBookingCheckout,
   getSedifexCheckoutReturnUrl,
 } from "../../../lib/sedifex";
@@ -25,9 +26,7 @@ function getNestedRecord(record: JsonRecord, key: string) {
 function getNumber(record: JsonRecord, key: string) {
   const value = record[key];
 
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
+  if (typeof value === "number" && Number.isFinite(value)) return value;
 
   if (typeof value === "string" && value.trim()) {
     const parsed = Number(value);
@@ -50,90 +49,65 @@ export async function POST(request: Request) {
       phone: getString(customerInput, "phone"),
     };
 
+    const slotId = getString(body, "slotId");
     const serviceId = getString(body, "serviceId") || "onco-nurse-consultation";
-    const serviceName =
-      getString(body, "serviceName") || "Onco-nurse Consultation";
-
+    const serviceName = getString(body, "serviceName") || "Onco-nurse Consultation";
     const country = getString(body, "country");
     const pathway = getString(body, "pathway");
     const germanLevel = getString(body, "germanLevel");
     const nursingBackground = getString(body, "nursingBackground");
     const notes = getString(body, "notes");
-    const bookingDate = getString(body, "bookingDate");
-    const bookingTime = getString(body, "bookingTime");
+    const bookingDate = getString(body, "bookingDate") || "Date to be announced";
+    const bookingTime = getString(body, "bookingTime") || "Time to be announced";
+    const scheduleStatus = getString(body, "scheduleStatus");
 
     if (!customer.name || !customer.phone) {
       return NextResponse.json(
-        {
-          ok: false,
-          error: "Name and phone are required.",
-        },
-        { status: 400 }
-      );
-    }
-
-    if (!bookingDate || !bookingTime) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "Preferred date and time are required.",
-        },
+        { ok: false, error: "Name and phone are required." },
         { status: 400 }
       );
     }
 
     if (customer.email && !/^\S+@\S+\.\S+$/.test(customer.email)) {
       return NextResponse.json(
-        {
-          ok: false,
-          error: "Enter a valid email address or leave the email field empty.",
-        },
+        { ok: false, error: "Enter a valid email address or leave the email field empty." },
         { status: 400 }
       );
     }
 
     const paymentAmount = getNumber(body, "paymentAmount") ?? 0;
-
-    if (paymentAmount <= 0) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "This service needs a Sedifex price before checkout can be created.",
-        },
-        { status: 400 }
-      );
-    }
-
     const requestUrl = new URL(request.url);
     const successUrl = new URL("/payment/success", requestUrl.origin).toString();
+    const source = slotId ? "manual_upcoming_event" : "website_booking_form";
+    const combinedNotes = [
+      country ? `Country: ${country}` : "",
+      pathway ? `Pathway: ${pathway}` : "",
+      germanLevel ? `German level: ${germanLevel}` : "",
+      nursingBackground ? `Nursing background: ${nursingBackground}` : "",
+      scheduleStatus ? `Schedule status: ${scheduleStatus}` : "",
+      slotId ? `Availability slot: ${slotId}` : "",
+      notes ? `Message: ${notes}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
 
-    const result = await createSedifexBookingCheckout({
+    const baseInput = {
+      slotId: slotId || undefined,
       serviceId,
       serviceName,
       bookingDate,
       bookingTime,
       quantity: 1,
       customer,
-      notes: [
-        country ? `Country: ${country}` : "",
-        pathway ? `Pathway: ${pathway}` : "",
-        germanLevel ? `German level: ${germanLevel}` : "",
-        nursingBackground
-          ? `Nursing background: ${nursingBackground}`
-          : "",
-        notes ? `Message: ${notes}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n"),
+      notes: combinedNotes,
       paymentAmount,
       sourceChannel: "client_website",
-      returnUrl: getSedifexCheckoutReturnUrl(successUrl),
       attributes: {
-        source: "website_booking_form",
+        source,
         sourceLabel: "Onco-nurse website",
         pageUrl: getString(attributesInput, "pageUrl"),
         successUrl,
+        scheduleStatus,
         timezone: getString(attributesInput, "timezone") || "Africa/Accra",
         locale: getString(attributesInput, "locale") || "en-GB",
         country,
@@ -141,6 +115,31 @@ export async function POST(request: Request) {
         germanLevel,
         nursingBackground,
       },
+    };
+
+    if (paymentAmount <= 0) {
+      const booking = await createSedifexBooking({
+        ...(baseInput as any),
+        paymentMethod: "manual",
+        bookingStatus: "booked",
+        paymentCollectionMode: "manual",
+        paymentStatus: "not_required",
+      });
+
+      return NextResponse.json({
+        ok: true,
+        booking,
+        reference: isRecord(booking)
+          ? getString(booking, "reference") || getString(booking, "bookingId") || getString(booking, "id")
+          : undefined,
+        redirectUrl: "/payment/success",
+      });
+    }
+
+    const result = await createSedifexBookingCheckout({
+      ...(baseInput as any),
+      paymentMethod: "paystack_checkout",
+      returnUrl: getSedifexCheckoutReturnUrl(successUrl),
     });
 
     return NextResponse.json(result);
@@ -148,8 +147,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         ok: false,
-        error:
-          error instanceof Error ? error.message : "Unable to submit booking.",
+        error: error instanceof Error ? error.message : "Unable to submit booking.",
       },
       { status: 500 }
     );
