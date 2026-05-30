@@ -61,6 +61,23 @@ export type SedifexHeroSlide = {
   imageUrl?: string;
 };
 
+export type SedifexEvent = {
+  id: string;
+  slug?: string;
+  title: string;
+  category?: string;
+  description?: string;
+  imageUrl?: string;
+  startDate?: string;
+  endDate?: string;
+  startTime?: string;
+  endTime?: string;
+  location?: string;
+  status?: string;
+  ctaLabel?: string;
+  ctaHref?: string;
+};
+
 export type SedifexProfile = {
   displayName?: string;
   tagline?: string;
@@ -213,18 +230,141 @@ function pickArray(payload: unknown): unknown[] {
   if (Array.isArray(payload)) return payload;
   if (!isRecord(payload)) return [];
 
-  const possible =
-    payload.blogPosts ||
-    payload.posts ||
-    payload.blogs ||
-    payload.articles ||
-    payload.items ||
-    payload.promos ||
-    payload.banners ||
-    payload.data ||
-    payload.content;
+  const keys = [
+    "events",
+    "upcomingEvents",
+    "calendarEvents",
+    "eventItems",
+    "blogPosts",
+    "posts",
+    "blogs",
+    "articles",
+    "items",
+    "promos",
+    "banners",
+    "data",
+    "content",
+  ];
 
-  return Array.isArray(possible) ? possible : [];
+  for (const key of keys) {
+    const possible = payload[key];
+    if (Array.isArray(possible) && possible.length) return possible;
+  }
+
+  return [];
+}
+
+const fallbackEvents: SedifexEvent[] = [
+  {
+    id: "nursing-webinar",
+    title: "Free Germany Nursing Webinar",
+    category: "Online Event",
+    description:
+      "Learn about Nursing Ausbildung, recognition, documents and Germany preparation.",
+    location: "Online / to be confirmed",
+    status: "upcoming",
+  },
+  {
+    id: "fsj-bfd-info",
+    title: "FSJ / BFD Info Session",
+    category: "Online Event",
+    description:
+      "Understand voluntary service options and how to prepare your application.",
+    location: "Online / to be confirmed",
+    status: "upcoming",
+  },
+  {
+    id: "student-visa-qa",
+    title: "Student Visa Q&A",
+    category: "Online Event",
+    description:
+      "Ask questions about visa documents, blocked account and interview preparation.",
+    location: "Online / to be confirmed",
+    status: "upcoming",
+  },
+];
+
+function normalizeEvent(raw: unknown, index: number): SedifexEvent {
+  const record = isRecord(raw) ? raw : {};
+  const title = readString(
+    record,
+    ["title", "name", "heading"],
+    `Event ${index + 1}`
+  );
+
+  return {
+    id: readString(record, ["id", "eventId", "slug"], `event-${index + 1}`),
+    slug: readString(record, ["slug"]) || undefined,
+    title,
+    category: readString(record, ["category", "type", "badge"]) || undefined,
+    description:
+      readString(record, ["description", "excerpt", "summary", "subtitle"]) ||
+      undefined,
+    imageUrl:
+      readString(record, [
+        "imageUrl",
+        "coverImageUrl",
+        "bannerImageUrl",
+        "image",
+      ]) || undefined,
+    startDate: readString(record, ["startDate", "date", "eventDate"]) || undefined,
+    endDate: readString(record, ["endDate"]) || undefined,
+    startTime: readString(record, ["startTime", "time"]) || undefined,
+    endTime: readString(record, ["endTime"]) || undefined,
+    location: readString(record, ["location", "venue"]) || undefined,
+    status: readString(record, ["status"]) || undefined,
+    ctaLabel: readString(record, ["ctaLabel", "buttonText"]) || undefined,
+    ctaHref:
+      readString(record, ["ctaHref", "buttonLink", "url"]) || undefined,
+  };
+}
+
+function isVisibleEvent(event: SedifexEvent) {
+  const status = (event.status || "").trim().toLowerCase();
+  return (
+    !status ||
+    status.includes("active") ||
+    status.includes("published") ||
+    status.includes("upcoming")
+  );
+}
+
+function isEventPromo(raw: unknown, event: SedifexEvent) {
+  const record = isRecord(raw) ? raw : {};
+  const marker = [
+    event.category,
+    event.title,
+    readString(record, ["type"]),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return /event|webinar|workshop|seminar|session|info session/.test(marker);
+}
+
+export async function getSedifexEvents(): Promise<SedifexEvent[]> {
+  const endpoints = [
+    "/v1IntegrationEvents",
+    "/v1IntegrationUpcomingEvents",
+    "/v1IntegrationCalendarEvents",
+    "/v1IntegrationPromo",
+  ];
+
+  for (const endpoint of endpoints) {
+    const payload = await sedifexGet<unknown>(endpoint, {}, 60, true);
+    const items = pickArray(payload);
+    const events = items
+      .map(normalizeEvent)
+      .filter((event, index) => {
+        if (!event.title || !isVisibleEvent(event)) return false;
+        return endpoint !== "/v1IntegrationPromo" || isEventPromo(items[index], event);
+      });
+
+    if (events.length) return events;
+  }
+
+  return fallbackEvents.map(normalizeEvent);
 }
 
 function normalizeBlogPost(raw: unknown, index: number): SedifexBlogPost {

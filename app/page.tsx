@@ -3,6 +3,7 @@ import Image from "next/image";
 import {
   formatPrice,
   getSedifexBlogPosts,
+  getSedifexEvents,
   getSedifexHeroSlides,
   getSedifexServices,
   getSedifexSocialSettings,
@@ -12,11 +13,12 @@ import {
 import { programs, site } from "../lib/site";
 
 export default async function HomePage() {
-  const [slides, services, social, posts] = await Promise.all([
+  const [slides, services, social, posts, events] = await Promise.all([
     getSedifexHeroSlides(),
     getSedifexServices(),
     getSedifexSocialSettings(),
     getSedifexBlogPosts(),
+    getSedifexEvents(),
   ]);
 
   const hero = slides[0];
@@ -175,6 +177,65 @@ export default async function HomePage() {
                 </p>
               </div>
             </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="section bg-white">
+        <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
+          <div>
+            <span className="badge">Upcoming Events</span>
+            <h2 className="section-title mt-4">Webinars and info sessions</h2>
+            <p className="section-subtitle">
+              Upcoming events are pulled from Sedifex when available, with local
+              fallback content for development.
+            </p>
+          </div>
+
+          <Link href="/events" className="btn-secondary">
+            View all events
+          </Link>
+        </div>
+
+        <div className="mt-10 grid gap-6 md:grid-cols-3">
+          {events.slice(0, 3).map((event) => (
+            <article
+              key={event.id}
+              className="rounded-3xl border border-slate-200 bg-slate-50 p-7 transition hover:-translate-y-1 hover:bg-white hover:shadow-xl"
+            >
+              <p className="text-xs font-black uppercase tracking-widest text-emerald-700">
+                {event.category || "Event"}
+              </p>
+
+              <h3 className="mt-3 text-2xl font-black text-slate-950">
+                {event.title}
+              </h3>
+
+              <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">
+                {event.description ||
+                  "Register interest and we will share the confirmed event details."}
+              </p>
+
+              <div className="mt-6 grid gap-1 text-sm text-slate-700">
+                <p>
+                  <strong>Date:</strong> {event.startDate || "Date to be announced"}
+                </p>
+                <p>
+                  <strong>Location:</strong>{" "}
+                  {event.location || "Online / to be confirmed"}
+                </p>
+              </div>
+
+              <Link
+                href={
+                  event.ctaHref ||
+                  `/book?serviceId=${encodeURIComponent(event.id)}&serviceName=${encodeURIComponent(event.title)}`
+                }
+                className="mt-6 inline-flex rounded-full bg-emerald-700 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-800"
+              >
+                {event.ctaLabel || "Register Interest"}
+              </Link>
+            </article>
           ))}
         </div>
       </section>
