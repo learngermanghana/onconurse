@@ -4,7 +4,7 @@ import {
   formatPrice,
   getSedifexServices,
   serviceHref,
-} from "../../lib/sedifex";
+} from "../../lib/sedifex-public";
 
 export default async function ServicesPage() {
   const services = await getSedifexServices();
