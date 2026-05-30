@@ -1,10 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import {
-  formatPrice,
-  getSedifexService,
-  whatsappLink,
-} from "../../../lib/sedifex-public";
+import { formatPrice, whatsappLink } from "../../../lib/sedifex-public";
+import { getOncoNurseService } from "../../../lib/onconurse-services";
 import { site } from "../../../lib/site";
 
 export default async function SingleServicePage({
@@ -13,7 +10,7 @@ export default async function SingleServicePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const service = await getSedifexService(slug);
+  const service = await getOncoNurseService(slug);
 
   if (!service) notFound();
 
