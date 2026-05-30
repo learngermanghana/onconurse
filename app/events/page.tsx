@@ -29,6 +29,22 @@ function availableSlotsText(value?: number) {
   return `${value} slots available`;
 }
 
+function isTimezoneValue(value?: string) {
+  return Boolean(
+    value && /^[A-Za-z_]+\/[A-Za-z_]+(?:\/[A-Za-z_]+)?$/.test(value.trim())
+  );
+}
+
+function displayLocation(value?: string) {
+  if (!value) return "Online / to be confirmed";
+  if (isTimezoneValue(value)) return "Online";
+  return value;
+}
+
+function displayTimezone(value?: string) {
+  return isTimezoneValue(value) ? value : "";
+}
+
 export default async function EventsPage() {
   const events = await getSedifexEvents();
 
@@ -75,6 +91,8 @@ export default async function EventsPage() {
               const date = formatDisplayDate(event.startDate);
               const time = formatDisplayTime(event.startTime, event.endTime);
               const slots = availableSlotsText(event.availableSlots);
+              const location = displayLocation(event.location);
+              const timezone = displayTimezone(event.location);
               const isFull = typeof event.availableSlots === "number" && event.availableSlots <= 0;
 
               return (
@@ -130,13 +148,20 @@ export default async function EventsPage() {
                         <p className="mt-1 font-bold text-slate-900">{time}</p>
                       </div>
 
+                      {timezone ? (
+                        <div>
+                          <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+                            Timezone
+                          </p>
+                          <p className="mt-1 font-bold text-slate-900">{timezone}</p>
+                        </div>
+                      ) : null}
+
                       <div>
                         <p className="text-xs font-black uppercase tracking-wide text-slate-400">
                           Location
                         </p>
-                        <p className="mt-1 font-bold text-slate-900">
-                          {event.location || "Online / to be confirmed"}
-                        </p>
+                        <p className="mt-1 font-bold text-slate-900">{location}</p>
                       </div>
                     </div>
 
