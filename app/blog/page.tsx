@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { getSedifexBlogPosts } from "../../lib/sedifex";
+import { getSedifexBlogPosts } from "../../lib/sedifex-public";
 
 function formatDisplayDate(value?: string) {
   if (!value) return "";
