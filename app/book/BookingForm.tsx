@@ -84,7 +84,7 @@ export default function BookingForm({
 
     const form = new FormData(event.currentTarget);
 
-    setStatus("Creating your booking before secure checkout...");
+    setStatus("Creating your booking...");
     setIsSubmitting(true);
 
     try {
@@ -126,7 +126,7 @@ export default function BookingForm({
 
       if (response.ok) {
         if (result.checkoutUrl || result.authorizationUrl) {
-          setStatus("Booking saved. Redirecting to secure Sedifex checkout...");
+          setStatus("Booking saved. Redirecting to the secure payment page...");
           window.location.assign(result.checkoutUrl || result.authorizationUrl);
           return;
         }
@@ -139,7 +139,7 @@ export default function BookingForm({
 
         setStatus(
           result.demoMode
-            ? "Demo booking received. Add Sedifex booking and checkout keys to redirect to payment."
+            ? "Booking received. Payment setup is not fully connected yet, so our team will contact you."
             : `Booking received successfully${
                 result.reference ? ` (${result.reference})` : ""
               }.`
@@ -169,33 +169,35 @@ export default function BookingForm({
         <h1 className="section-title mt-4">Start your Germany pathway with guidance</h1>
 
         <p className="section-subtitle">
-          Choose a Sedifex service or upcoming event, request a date and time,
-          then pay through secure Sedifex checkout when payment is required.
+          Choose the service or event you are interested in, fill in your details,
+          and submit your booking. If payment is required, you will be sent to a
+          secure payment page before final confirmation.
         </p>
 
         <div className="mt-8 rounded-3xl border border-emerald-100 bg-white p-6 shadow-sm">
           <p className="text-sm font-black uppercase tracking-[0.16em] text-emerald-700">
-            How Sedifex booking + payment works
+            What happens after you book?
           </p>
           <ol className="mt-4 space-y-4 text-sm leading-6 text-slate-600">
             <li>
-              <span className="font-black text-slate-950">1. Server fetch:</span>{" "}
-              The page loads services and manual upcoming events from Sedifex.
+              <span className="font-black text-slate-950">1. Choose your support:</span>{" "}
+              Select a consultation, document review, visa support, nursing pathway,
+              or upcoming event.
             </li>
             <li>
-              <span className="font-black text-slate-950">2. Manual events:</span>{" "}
-              Upcoming events use the availability slot as the source of truth,
-              including image, title, schedule and capacity.
+              <span className="font-black text-slate-950">2. Share your details:</span>{" "}
+              Enter your name, WhatsApp number, current country, German level and
+              preferred date or time.
             </li>
             <li>
-              <span className="font-black text-slate-950">3. Slot booking:</span>{" "}
-              If a selected event has a slotId, the booking sends the slotId so
-              Sedifex can resolve the event and increment seats booked.
+              <span className="font-black text-slate-950">3. Submit your booking:</span>{" "}
+              We save your request so our team can prepare the right guidance for you.
             </li>
             <li>
-              <span className="font-black text-slate-950">4. Checkout:</span>{" "}
-              Paid services open Sedifex checkout. Free or TBA events register
-              interest and return to the success page.
+              <span className="font-black text-slate-950">4. Payment or follow-up:</span>{" "}
+              If the service has a fee, you will pay securely online. If it is an
+              enquiry or date/time is not confirmed yet, we will contact you with
+              the next steps.
             </li>
           </ol>
         </div>
@@ -218,7 +220,7 @@ export default function BookingForm({
 
         <div className="grid gap-5 md:grid-cols-2">
           <div className="md:col-span-2">
-            <label className="label">Sedifex service or upcoming event</label>
+            <label className="label">Service or upcoming event</label>
             <select
               name="serviceId"
               className="input mt-2"
@@ -239,7 +241,7 @@ export default function BookingForm({
 
           {isSelectedEvent ? (
             <div className="md:col-span-2 rounded-2xl bg-amber-50 p-4 text-sm font-bold text-amber-900">
-              This is an upcoming event from Sedifex availability. We will send the slot ID with your booking.
+              You selected an upcoming event. Submit your details and we will reserve or confirm your interest for this session.
             </div>
           ) : null}
 
@@ -350,7 +352,7 @@ export default function BookingForm({
         {selectedService?.priceLabel && (
           <p className="mt-5 rounded-2xl bg-emerald-50 p-4 text-sm font-bold text-emerald-900">
             {selectedPrice > 0
-              ? `Checkout total: ${selectedService.priceLabel}. After payment, Sedifex will return you to the success page while final verification is completed.`
+              ? `Amount to pay: ${selectedService.priceLabel}. After payment, you will return to the confirmation page while final verification is completed.`
               : "No online payment is required now. Your interest will be registered for follow-up."}
           </p>
         )}
@@ -363,7 +365,7 @@ export default function BookingForm({
           {isSubmitting
             ? "Creating booking..."
             : selectedPrice > 0
-              ? "Book & Pay with Sedifex"
+              ? "Book & Pay Securely"
               : "Register Interest"}
         </button>
 
