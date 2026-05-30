@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { getSedifexEvents } from "../../lib/sedifex";
+import { getSedifexEvents } from "../../lib/sedifex-public";
 
 export default async function EventsPage() {
   const events = await getSedifexEvents();
