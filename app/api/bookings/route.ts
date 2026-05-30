@@ -4,10 +4,12 @@ import {
   getSedifexCheckoutReturnUrl,
 } from "../../../lib/sedifex";
 
+export const dynamic = "force-dynamic";
+
 type JsonRecord = Record<string, unknown>;
 
 function isRecord(value: unknown): value is JsonRecord {
-  return typeof value === "object" && value !== null;
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function getString(record: JsonRecord, key: string) {
@@ -22,7 +24,11 @@ function getNestedRecord(record: JsonRecord, key: string) {
 
 function getNumber(record: JsonRecord, key: string) {
   const value = record[key];
-  if (typeof value === "number" && Number.isFinite(value)) return value;
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
   if (typeof value === "string" && value.trim()) {
     const parsed = Number(value);
     if (Number.isFinite(parsed)) return parsed;
@@ -36,12 +42,17 @@ export async function POST(request: Request) {
     const payload: unknown = await request.json();
     const body = isRecord(payload) ? payload : {};
     const customerInput = getNestedRecord(body, "customer");
+    const attributesInput = getNestedRecord(body, "attributes");
 
     const customer = {
       name: getString(customerInput, "name"),
       email: getString(customerInput, "email"),
       phone: getString(customerInput, "phone"),
     };
+
+    const serviceId = getString(body, "serviceId") || "pirus-consultation";
+    const serviceName =
+      getString(body, "serviceName") || "Pirus Consultancy Consultation";
 
     const country = getString(body, "country");
     const pathway = getString(body, "pathway");
@@ -50,7 +61,6 @@ export async function POST(request: Request) {
     const notes = getString(body, "notes");
     const bookingDate = getString(body, "bookingDate");
     const bookingTime = getString(body, "bookingTime");
-    const attributesInput = getNestedRecord(body, "attributes");
 
     if (!customer.name || !customer.phone) {
       return NextResponse.json(
@@ -96,9 +106,10 @@ export async function POST(request: Request) {
     }
 
     const requestUrl = new URL(request.url);
+
     const result = await createSedifexBookingCheckout({
-      serviceId: getString(body, "serviceId") || "onco-nurse-consultation",
-      serviceName: getString(body, "serviceName") || "Onco-nurse Consultation",
+      serviceId,
+      serviceName,
       bookingDate,
       bookingTime,
       quantity: 1,
@@ -107,7 +118,9 @@ export async function POST(request: Request) {
         country ? `Country: ${country}` : "",
         pathway ? `Pathway: ${pathway}` : "",
         germanLevel ? `German level: ${germanLevel}` : "",
-        nursingBackground ? `Nursing background: ${nursingBackground}` : "",
+        nursingBackground
+          ? `Nursing background: ${nursingBackground}`
+          : "",
         notes ? `Message: ${notes}` : "",
       ]
         .filter(Boolean)
@@ -119,7 +132,7 @@ export async function POST(request: Request) {
       ),
       attributes: {
         source: "website_booking_form",
-        sourceLabel: "Onco-nurse website",
+        sourceLabel: "Pirus Consultancy website",
         pageUrl: getString(attributesInput, "pageUrl"),
         timezone: getString(attributesInput, "timezone") || "Africa/Accra",
         locale: getString(attributesInput, "locale") || "en-GB",
