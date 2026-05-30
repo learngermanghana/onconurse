@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import {
   getSedifexBlogPost,
   sanitizeSedifexHtml,
-} from "../../../lib/sedifex";
+} from "../../../lib/sedifex-public";
 
 function formatDisplayDate(value?: string) {
   if (!value) return "";
