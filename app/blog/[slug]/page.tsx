@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getSedifexBlogPosts } from "../../../lib/sedifex";
 
@@ -43,9 +44,12 @@ export default async function BlogDetailsPage({
 
       <div className="mt-10 max-w-4xl rounded-[2rem] bg-white p-6 shadow-sm md:p-10">
         {post.imageUrl && (
-          <img
+          <Image
             src={post.imageUrl}
             alt={post.title}
+            width={1200}
+            height={675}
+            sizes="(min-width: 768px) 896px, 100vw"
             className="mb-8 max-h-[420px] w-full rounded-3xl object-cover"
           />
         )}

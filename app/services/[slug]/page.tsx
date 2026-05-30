@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import {
   formatPrice,
   getSedifexServices,
+  getServiceSlug,
   slugify,
   whatsappLink,
 } from "../../../lib/sedifex";
@@ -15,7 +16,12 @@ export default async function SingleServicePage({
 }) {
   const { slug } = await params;
   const services = await getSedifexServices();
-  const service = services.find((item) => slugify(item.name) === slug);
+  const service = services.find(
+    (item) =>
+      getServiceSlug(item) === slug ||
+      item.id === slug ||
+      slugify(item.name) === slug
+  );
 
   if (!service) notFound();
 

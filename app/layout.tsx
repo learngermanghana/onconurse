@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { site } from "../lib/site";
+import { whatsappLink } from "../lib/sedifex";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -74,9 +76,9 @@ function Footer() {
         <div>
           <p className="font-bold">Contact</p>
           <div className="mt-4 grid gap-2 text-sm text-slate-300">
-            <span>hello@onconurse.com</span>
-            <span>+233000000000</span>
-            <span>@onco_nurse</span>
+            <span>{site.email}</span>
+            <span>{site.phone}</span>
+            <span>@{site.handle}</span>
           </div>
         </div>
       </div>
@@ -85,13 +87,12 @@ function Footer() {
 }
 
 function FloatingWhatsApp() {
-  const message = encodeURIComponent(
-    "Hello Onco-nurse, I want guidance for Germany nursing pathway."
-  );
+  const message =
+    "Hello Onco-nurse, I want guidance for Germany nursing pathway.";
 
   return (
     <a
-      href={`https://wa.me/233000000000?text=${message}`}
+      href={whatsappLink(site.whatsapp, message)}
       target="_blank"
       rel="noreferrer"
       className="fixed bottom-6 right-6 z-50 rounded-full bg-emerald-700 px-5 py-4 text-sm font-black text-white shadow-2xl hover:bg-emerald-800"

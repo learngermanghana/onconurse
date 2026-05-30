@@ -21,6 +21,7 @@ const SEDIFEX_CONTRACT_VERSION =
 
 export type SedifexService = {
   id: string;
+  slug?: string;
   storeId?: string;
   name: string;
   category?: string;
@@ -187,60 +188,85 @@ export async function getSedifexSocialSettings(): Promise<{
   return sedifexGet("/v1IntegrationSocialSettings", {}, 60);
 }
 
-function pickArray(payload: any): any[] {
+type SedifexRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is SedifexRecord {
+  return typeof value === "object" && value !== null;
+}
+
+function readString(
+  record: SedifexRecord,
+  keys: string[],
+  fallback = ""
+): string {
+  for (const key of keys) {
+    const value = record[key];
+
+    if (typeof value === "string" && value.trim()) return value;
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+
+  return fallback;
+}
+
+function pickArray(payload: unknown): unknown[] {
   if (Array.isArray(payload)) return payload;
+  if (!isRecord(payload)) return [];
 
   const possible =
-    payload?.blogPosts ||
-    payload?.posts ||
-    payload?.blogs ||
-    payload?.articles ||
-    payload?.items ||
-    payload?.promos ||
-    payload?.banners ||
-    payload?.data ||
-    payload?.content;
+    payload.blogPosts ||
+    payload.posts ||
+    payload.blogs ||
+    payload.articles ||
+    payload.items ||
+    payload.promos ||
+    payload.banners ||
+    payload.data ||
+    payload.content;
 
   return Array.isArray(possible) ? possible : [];
 }
 
-function normalizeBlogPost(raw: any, index: number): SedifexBlogPost {
-  const title =
-    raw?.title ||
-    raw?.name ||
-    raw?.heading ||
-    raw?.promoTitle ||
-    raw?.bannerTitle ||
-    `Blog post ${index + 1}`;
+function normalizeBlogPost(raw: unknown, index: number): SedifexBlogPost {
+  const record = isRecord(raw) ? raw : {};
+  const title = readString(
+    record,
+    ["title", "name", "heading", "promoTitle", "bannerTitle"],
+    `Blog post ${index + 1}`
+  );
 
-  const excerpt =
-    raw?.excerpt ||
-    raw?.summary ||
-    raw?.subtitle ||
-    raw?.description ||
-    raw?.shortDescription ||
-    "";
+  const excerpt = readString(record, [
+    "excerpt",
+    "summary",
+    "subtitle",
+    "description",
+    "shortDescription",
+  ]);
 
   const content =
-    raw?.content ||
-    raw?.body ||
-    raw?.article ||
-    raw?.longDescription ||
-    raw?.html ||
-    excerpt ||
-    "";
+    readString(record, ["content", "body", "article", "longDescription", "html"]) ||
+    excerpt;
 
   return {
-    id: String(raw?.id || raw?.postId || raw?.slug || `blog-${index + 1}`),
-    slug: String(raw?.slug || slugify(title)),
-    title: String(title),
-    category: String(raw?.category || raw?.type || raw?.badge || "Germany Pathway"),
-    excerpt: String(excerpt),
-    content: String(content),
-    imageUrl: String(raw?.imageUrl || raw?.coverImageUrl || raw?.bannerImageUrl || raw?.image || ""),
-    publishedAt: String(raw?.publishedAt || raw?.createdAt || raw?.updatedAt || ""),
-    updatedAt: raw?.updatedAt,
-    author: raw?.author || raw?.authorName || "Onco-nurse",
+    id: readString(record, ["id", "postId", "slug"], `blog-${index + 1}`),
+    slug: readString(record, ["slug"], slugify(title)),
+    title,
+    category: readString(
+      record,
+      ["category", "type", "badge"],
+      "Germany Pathway"
+    ),
+    excerpt,
+    content,
+    imageUrl: readString(record, [
+      "imageUrl",
+      "coverImageUrl",
+      "bannerImageUrl",
+      "image",
+    ]),
+    publishedAt: readString(record, ["publishedAt", "createdAt", "updatedAt"]),
+    updatedAt: readString(record, ["updatedAt"]) || undefined,
+    author: readString(record, ["author", "authorName"], "Onco-nurse"),
   };
 }
 
@@ -253,7 +279,7 @@ export async function getSedifexBlogPosts(): Promise<SedifexBlogPost[]> {
   ];
 
   for (const endpoint of endpoints) {
-    const payload = await sedifexGet<any>(endpoint, {}, 60, true);
+    const payload = await sedifexGet<unknown>(endpoint, {}, 60, true);
     const items = pickArray(payload);
 
     if (items.length) {
@@ -293,6 +319,14 @@ export async function createSedifexBooking(input: {
       ...input.attributes,
     },
   });
+}
+
+export function getServiceSlug(service: Pick<SedifexService, "id" | "name" | "slug">) {
+  return service.slug || service.id || slugify(service.name);
+}
+
+export function serviceHref(service: Pick<SedifexService, "id" | "name" | "slug">) {
+  return `/services/${encodeURIComponent(getServiceSlug(service))}`;
 }
 
 export function slugify(value: string) {

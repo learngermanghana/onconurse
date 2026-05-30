@@ -1,15 +1,39 @@
 import { NextResponse } from "next/server";
 import { createSedifexBooking } from "../../../lib/sedifex";
 
+type JsonRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is JsonRecord {
+  return typeof value === "object" && value !== null;
+}
+
+function getString(record: JsonRecord, key: string) {
+  const value = record[key];
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function getNestedRecord(record: JsonRecord, key: string) {
+  const value = record[key];
+  return isRecord(value) ? value : {};
+}
+
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const payload: unknown = await request.json();
+    const body = isRecord(payload) ? payload : {};
+    const customerInput = getNestedRecord(body, "customer");
 
     const customer = {
-      name: String(body.customer?.name || "").trim(),
-      email: String(body.customer?.email || "").trim(),
-      phone: String(body.customer?.phone || "").trim(),
+      name: getString(customerInput, "name"),
+      email: getString(customerInput, "email"),
+      phone: getString(customerInput, "phone"),
     };
+
+    const country = getString(body, "country");
+    const pathway = getString(body, "pathway");
+    const germanLevel = getString(body, "germanLevel");
+    const nursingBackground = getString(body, "nursingBackground");
+    const notes = getString(body, "notes");
 
     if (!customer.name || !customer.phone) {
       return NextResponse.json(
@@ -21,29 +45,39 @@ export async function POST(request: Request) {
       );
     }
 
+    if (customer.email && !/^\S+@\S+\.\S+$/.test(customer.email)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Enter a valid email address or leave the email field empty.",
+        },
+        { status: 400 }
+      );
+    }
+
     const result = await createSedifexBooking({
-      serviceId: String(body.serviceId || "onco-nurse-consultation"),
-      serviceName: String(body.serviceName || "Onco-nurse Consultation"),
-      bookingDate: String(body.bookingDate || ""),
-      bookingTime: String(body.bookingTime || ""),
+      serviceId: getString(body, "serviceId") || "onco-nurse-consultation",
+      serviceName: getString(body, "serviceName") || "Onco-nurse Consultation",
+      bookingDate: getString(body, "bookingDate"),
+      bookingTime: getString(body, "bookingTime"),
       quantity: 1,
       customer,
       notes: [
-        body.country ? `Country: ${body.country}` : "",
-        body.pathway ? `Pathway: ${body.pathway}` : "",
-        body.germanLevel ? `German level: ${body.germanLevel}` : "",
-        body.nursingBackground ? `Nursing background: ${body.nursingBackground}` : "",
-        body.notes ? `Message: ${body.notes}` : "",
+        country ? `Country: ${country}` : "",
+        pathway ? `Pathway: ${pathway}` : "",
+        germanLevel ? `German level: ${germanLevel}` : "",
+        nursingBackground ? `Nursing background: ${nursingBackground}` : "",
+        notes ? `Message: ${notes}` : "",
       ]
         .filter(Boolean)
         .join("\n"),
       paymentMethod: "manual",
       attributes: {
         source: "onco_nurse_website",
-        country: body.country || "",
-        pathway: body.pathway || "",
-        germanLevel: body.germanLevel || "",
-        nursingBackground: body.nursingBackground || "",
+        country,
+        pathway,
+        germanLevel,
+        nursingBackground,
       },
     });
 
