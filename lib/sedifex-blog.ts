@@ -58,11 +58,11 @@ function isRecord(value: unknown): value is RecordValue {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function hasValue(value?: string) {
+function hasValue(value?: string): boolean {
   return Boolean(value && !value.includes("PASTE_") && !value.includes("YOUR_"));
 }
 
-function readString(record: RecordValue, keys: string[], fallback = "") {
+function readString(record: RecordValue, keys: string[], fallback = ""): string {
   for (const key of keys) {
     const value = record[key];
 
@@ -78,11 +78,11 @@ function readString(record: RecordValue, keys: string[], fallback = "") {
   return fallback;
 }
 
-function normalizedKey(value: string) {
+function normalizedKey(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function objectLooksLikeBlogPost(value: unknown) {
+function objectLooksLikeBlogPost(value: unknown): boolean {
   if (!isRecord(value)) return false;
 
   const title = readString(value, [
@@ -265,7 +265,7 @@ function normalizeBlogPost(raw: unknown, index: number): SedifexBlogPost {
   };
 }
 
-function shouldShow(raw: unknown) {
+function shouldShow(raw: unknown): boolean {
   if (!isRecord(raw)) return true;
   const status = readString(raw, ["status", "visibility", "publishStatus", "publish_status", "state"]).toLowerCase();
 
@@ -273,7 +273,7 @@ function shouldShow(raw: unknown) {
   return true;
 }
 
-function isBlogPromo(raw: unknown) {
+function isBlogPromo(raw: unknown): boolean {
   if (!isRecord(raw)) return false;
 
   const marker = [
@@ -287,7 +287,7 @@ function isBlogPromo(raw: unknown) {
   return /blog|post|article|guide|news|story|nursing|germany|ausbildung|fsj|bfd|visa|recognition/.test(marker);
 }
 
-function dedupePosts(posts: SedifexBlogPost[]) {
+function dedupePosts(posts: SedifexBlogPost[]): SedifexBlogPost[] {
   const seen = new Set<string>();
 
   return posts.filter((post) => {
@@ -298,7 +298,7 @@ function dedupePosts(posts: SedifexBlogPost[]) {
   });
 }
 
-async function fetchSedifexBlog(attempt: BlogAttempt) {
+async function fetchSedifexBlog(attempt: BlogAttempt): Promise<unknown | null> {
   if (attempt.authenticated && !hasValue(SEDIFEX_API_KEY)) return null;
 
   try {
@@ -327,7 +327,7 @@ async function fetchSedifexBlog(attempt: BlogAttempt) {
   }
 }
 
-function normalizePostsFromPayload(payload: unknown, promo = false) {
+function normalizePostsFromPayload(payload: unknown, promo = false): SedifexBlogPost[] {
   return dedupePosts(
     collectBlogLikeObjects(payload)
       .filter((item) => shouldShow(item))
@@ -363,7 +363,7 @@ export async function getSedifexBlogPosts(): Promise<SedifexBlogPost[]> {
   return legacy.length ? legacy : fallbackBlogPosts.map(normalizeBlogPost);
 }
 
-function firstBlogObject(payload: unknown) {
+function firstBlogObject(payload: unknown): unknown | null {
   const objects = collectBlogLikeObjects(payload);
   return objects[0] || null;
 }
