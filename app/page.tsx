@@ -155,8 +155,8 @@ export default async function HomePage() {
             <span className="badge">Blog Highlights</span>
             <h2 className="section-title mt-4">Latest Germany pathway guides</h2>
             <p className="section-subtitle">
-              Helpful articles from Onco-nurse. When Sedifex blog or promo
-              content is connected, this section will update from Sedifex.
+              Helpful articles from Onco-nurse to help you understand Germany
+              nursing, Ausbildung, recognition, documents and visa preparation.
             </p>
           </div>
 
@@ -216,8 +216,8 @@ export default async function HomePage() {
             <span className="badge">Upcoming Events</span>
             <h2 className="section-title mt-4">Webinars and info sessions</h2>
             <p className="section-subtitle">
-              Upcoming events are pulled from Sedifex when available, with local
-              fallback content for development.
+              Join upcoming webinars, information sessions and events. Register
+              your interest and our team will follow up with the details.
             </p>
           </div>
 
@@ -275,14 +275,14 @@ export default async function HomePage() {
       </section>
 
       <section className="section">
-        <span className="badge">Services from Sedifex</span>
+        <span className="badge">Services</span>
 
         <div className="mt-4 flex flex-col justify-between gap-6 md:flex-row md:items-end">
           <div>
             <h2 className="section-title">How we can help</h2>
             <p className="section-subtitle">
-              Services, prices and descriptions can be managed directly from
-              Sedifex without editing the website code.
+              Choose the right support for your Germany pathway. Prices and
+              details are shown clearly so you can book with confidence.
             </p>
           </div>
 
