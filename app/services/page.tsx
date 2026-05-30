@@ -29,8 +29,8 @@ export default async function ServicesPage() {
               Book Consultation
             </Link>
 
-            <Link href="/programs" className="btn-secondary">
-              View Pathways
+            <Link href="/events" className="btn-secondary">
+              Upcoming Events
             </Link>
           </div>
         </div>

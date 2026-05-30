@@ -7,20 +7,21 @@ export default async function EventsPage() {
 
   return (
     <section className="section">
-      <span className="badge">Upcoming Events</span>
+      <span className="badge">Sedifex Availability</span>
 
-      <h1 className="section-title mt-4">Webinars and Info Sessions</h1>
+      <h1 className="section-title mt-4">Upcoming Events</h1>
 
       <p className="section-subtitle">
-        Events are pulled from Sedifex when the integration is configured. Local
-        fallback events remain available for development and missing Sedifex keys.
+        Upcoming events are pulled from the Sedifex availability API when the
+        integration is configured. Local fallback events remain available for
+        development and missing Sedifex keys.
       </p>
 
       <div className="mt-10 grid gap-6 md:grid-cols-3">
         {events.map((event) => {
           const href =
             event.ctaHref ||
-            `/book?serviceId=${encodeURIComponent(event.id)}&serviceName=${encodeURIComponent(event.title)}`;
+            `/book?serviceId=${encodeURIComponent(event.serviceId || event.id)}&serviceName=${encodeURIComponent(event.serviceName || event.title)}`;
           const label = event.ctaLabel || "Register Interest";
 
           return (
@@ -65,6 +66,11 @@ export default async function EventsPage() {
                     <strong>Location:</strong>{" "}
                     {event.location || "Online / to be confirmed"}
                   </p>
+                  {typeof event.availableSlots === "number" ? (
+                    <p>
+                      <strong>Available slots:</strong> {event.availableSlots}
+                    </p>
+                  ) : null}
                 </div>
 
                 <Link

@@ -45,7 +45,9 @@ NEXT_PUBLIC_SEDIFEX_STORE_ID=your-public-store-id
 ## Sedifex service pull integration
 
 Services are pulled by `getSedifexServices()` / `getServiceData()` in
-`lib/sedifex.ts`. The website first calls:
+`lib/sedifex.ts`. Service detail pages call `getSedifexService()` first so
+`/services/[slug]` can refresh from Sedifex item endpoints before falling back
+to the list response. The website service list first calls:
 
 ```text
 GET /v1IntegrationProducts?storeId=<store id>
@@ -71,6 +73,25 @@ cleaning metadata-like description lines, removing `not provided` categories,
 using `imageUrl` or the first `imageUrls` item, and preserving Sedifex ordering
 with preferred Onco-nurse service names first. If Sedifex is not configured,
 returns no matching services, or errors, local fallback services are rendered.
+
+Service detail pages try these Sedifex item endpoints with `slug` and `itemId`
+lookups before falling back to the service list:
+
+```text
+GET /v1IntegrationItem?storeId=<store id>&slug=<slug>
+GET /v1IntegrationItems?storeId=<store id>&slug=<slug>
+GET /v1IntegrationProduct?storeId=<store id>&slug=<slug>
+GET /publicQuickPayItem?storeId=<store id>&slug=<slug>
+```
+
+## Sedifex availability / upcoming events integration
+
+The `/events` page is labelled Upcoming Events and pulls from Sedifex
+availability endpoints first, including public availability fallbacks when
+available. The site checks availability-shaped payload keys
+such as `availability`, `availabilities`, `availableSlots`, `slots`,
+`appointments`, and `bookableSlots`, then falls back to older event endpoints
+and finally local demo events if nothing is configured.
 
 
 ## Sedifex booking and checkout integration
