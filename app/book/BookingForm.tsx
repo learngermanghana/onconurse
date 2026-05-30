@@ -5,23 +5,25 @@ import { useMemo, useState } from "react";
 type BookingServiceOption = {
   id: string;
   name: string;
+  priceLabel?: string;
   price?: number;
+  category?: string;
 };
 
 type BookingFormProps = {
   initialServiceId?: string;
   initialServiceName?: string;
-  services?: BookingServiceOption[];
+  serviceOptions?: BookingServiceOption[];
 };
 
 export default function BookingForm({
   initialServiceId = "",
   initialServiceName = "",
-  services = [],
+  serviceOptions = [],
 }: BookingFormProps) {
   const initialService = useMemo(
-    () => services.find((service) => service.id === initialServiceId),
-    [initialServiceId, services]
+    () => serviceOptions.find((service) => service.id === initialServiceId),
+    [initialServiceId, serviceOptions]
   );
   const [status, setStatus] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -32,14 +34,14 @@ export default function BookingForm({
     initialService?.name || initialServiceName
   );
 
-  const selectedService = services.find(
+  const selectedService = serviceOptions.find(
     (service) => service.id === selectedServiceId
   );
 
   function updateSelectedService(serviceId: string) {
     setSelectedServiceId(serviceId);
 
-    const nextService = services.find((service) => service.id === serviceId);
+    const nextService = serviceOptions.find((service) => service.id === serviceId);
     if (nextService) setServiceName(nextService.name);
   }
 
@@ -121,6 +123,33 @@ export default function BookingForm({
           integration key is configured.
         </p>
 
+        <div className="mt-8 rounded-3xl border border-emerald-100 bg-white p-6 shadow-sm">
+          <p className="text-sm font-black uppercase tracking-[0.16em] text-emerald-700">
+            How Sedifex data loads
+          </p>
+          <ol className="mt-4 space-y-4 text-sm leading-6 text-slate-600">
+            <li>
+              <span className="font-black text-slate-950">1. Server fetch:</span>{" "}
+              The /book page awaits getServiceData() before rendering this form.
+            </li>
+            <li>
+              <span className="font-black text-slate-950">2. Product lookup:</span>{" "}
+              Sedifex services come from /v1IntegrationProducts?storeId=... with
+              the configured integration key and contract version.
+            </li>
+            <li>
+              <span className="font-black text-slate-950">3. Public fallback:</span>{" "}
+              If no services are returned, the page falls back to
+              /publicQuickPayCatalog?storeId=... and keeps only service records.
+            </li>
+            <li>
+              <span className="font-black text-slate-950">4. Form options:</span>{" "}
+              Records are normalized into id, name, category and price values,
+              then rendered as the dropdown below.
+            </li>
+          </ol>
+        </div>
+
         <div className="mt-8 rounded-3xl bg-slate-950 p-6 text-white">
           <p className="font-black">We can help with:</p>
           <ul className="mt-4 space-y-3 text-slate-300">
@@ -150,9 +179,9 @@ export default function BookingForm({
               <option value="onco-nurse-consultation">
                 General Onco-nurse consultation
               </option>
-              {services.map((service) => (
+              {serviceOptions.map((service) => (
                 <option key={service.id} value={service.id}>
-                  {service.name}
+                  {service.name}{service.priceLabel ? ` — ${service.priceLabel}` : ""}
                 </option>
               ))}
             </select>
