@@ -142,22 +142,23 @@ export default function BookingForm({
           <ol className="mt-4 space-y-4 text-sm leading-6 text-slate-600">
             <li>
               <span className="font-black text-slate-950">1. Server fetch:</span>{" "}
-              The /book page awaits getServiceData() before rendering this form.
+              The /book page awaits getSedifexServices() from the flexible
+              Sedifex public integration before rendering this form.
             </li>
             <li>
-              <span className="font-black text-slate-950">2. Product lookup:</span>{" "}
-              Sedifex services come from /v1IntegrationProducts?storeId=... with
-              the configured integration key and contract version.
+              <span className="font-black text-slate-950">2. Service lookup:</span>{" "}
+              Services are checked across /v1IntegrationServices,
+              /v1IntegrationProducts and other Sedifex service/catalog endpoints.
             </li>
             <li>
               <span className="font-black text-slate-950">3. Public fallback:</span>{" "}
-              If no services are returned, the page falls back to
-              /publicQuickPayCatalog?storeId=... and keeps only service records.
+              If the private service response is empty, the page also checks
+              /publicQuickPayCatalog, /api/public/services and /api/public/catalog.
             </li>
             <li>
-              <span className="font-black text-slate-950">4. Checkout:</span>{" "}
-              After the booking record is created, Sedifex checkout opens with
-              the same store id, service id and booking reference.
+              <span className="font-black text-slate-950">4. Checkout + success:</span>{" "}
+              After the booking record is created, Sedifex checkout opens and
+              returns the client to the success page for next steps.
             </li>
           </ol>
         </div>
@@ -307,8 +308,8 @@ export default function BookingForm({
 
         {selectedService?.priceLabel && (
           <p className="mt-5 rounded-2xl bg-emerald-50 p-4 text-sm font-bold text-emerald-900">
-            Checkout total: {selectedService.priceLabel}. Payment is verified by
-            Sedifex after checkout; the return page will not mark payment paid.
+            Checkout total: {selectedService.priceLabel}. After payment, Sedifex
+            will return you to the success page while final verification is completed.
           </p>
         )}
 
