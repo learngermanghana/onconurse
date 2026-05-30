@@ -70,15 +70,15 @@ function isRecord(value: unknown): value is SedifexRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function usable(value?: string) {
+function usable(value?: string): boolean {
   return Boolean(value && !value.includes("PASTE_") && !value.includes("YOUR_"));
 }
 
-function normalizeKey(value: string) {
+function normalizeKey(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function readString(record: SedifexRecord, keys: string[], fallback = "") {
+function readString(record: SedifexRecord, keys: string[], fallback = ""): string {
   for (const key of keys) {
     const value = record[key];
     if (typeof value === "string" && value.trim()) return value.trim();
@@ -93,7 +93,7 @@ function readString(record: SedifexRecord, keys: string[], fallback = "") {
   return fallback;
 }
 
-function readNumber(record: SedifexRecord, keys: string[]) {
+function readNumber(record: SedifexRecord, keys: string[]): number | undefined {
   for (const key of keys) {
     const value = record[key];
     if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -106,7 +106,7 @@ function readNumber(record: SedifexRecord, keys: string[]) {
   return undefined;
 }
 
-function readBoolean(record: SedifexRecord, keys: string[]) {
+function readBoolean(record: SedifexRecord, keys: string[]): boolean | undefined {
   for (const key of keys) {
     const value = record[key];
     if (typeof value === "boolean") return value;
@@ -120,7 +120,7 @@ function readBoolean(record: SedifexRecord, keys: string[]) {
   return undefined;
 }
 
-function readStringArray(record: SedifexRecord, keys: string[]) {
+function readStringArray(record: SedifexRecord, keys: string[]): string[] {
   for (const key of keys) {
     const value = record[key];
     if (!Array.isArray(value)) continue;
@@ -186,7 +186,7 @@ async function fetchJson(attempt: Attempt): Promise<unknown | null> {
   }
 }
 
-function dedupeByKey<T>(items: T[], key: (item: T) => string) {
+function dedupeByKey<T>(items: T[], key: (item: T) => string): T[] {
   const seen = new Set<string>();
   return items.filter((item) => {
     const value = key(item).toLowerCase();
@@ -196,7 +196,7 @@ function dedupeByKey<T>(items: T[], key: (item: T) => string) {
   });
 }
 
-function normalizeDescription(description: string) {
+function normalizeDescription(description: string): string {
   return description
     .split(/\r?\n/)
     .map((line) => line.replace(/\*\*/g, "").trim())
@@ -208,7 +208,7 @@ function normalizeDescription(description: string) {
     .trim();
 }
 
-function normalizeCategory(category: string) {
+function normalizeCategory(category: string): string {
   return /^not provided$/i.test(category.trim()) ? "" : category.trim();
 }
 
@@ -225,13 +225,13 @@ const preferredServiceNames = [
   "consultation",
 ];
 
-function preferredServiceIndex(service: SedifexService) {
+function preferredServiceIndex(service: SedifexService): number {
   const searchable = `${service.name} ${service.category || ""}`.toLowerCase();
   const index = preferredServiceNames.findIndex((name) => searchable.includes(name));
   return index === -1 ? Number.POSITIVE_INFINITY : index;
 }
 
-function isProbablyService(raw: unknown) {
+function isProbablyService(raw: unknown): boolean {
   if (!isRecord(raw)) return false;
 
   const typeText = [
@@ -277,7 +277,7 @@ function normalizeService(raw: unknown, index: number): SedifexService {
   };
 }
 
-function sortServices(services: SedifexService[]) {
+function sortServices(services: SedifexService[]): SedifexService[] {
   return dedupeByKey(services, (service) => service.slug || service.id || service.name)
     .map((service, index) => ({ service, index }))
     .sort((left, right) => {
@@ -295,7 +295,7 @@ function sortServices(services: SedifexService[]) {
     .map(({ service }) => service);
 }
 
-function extractServices(payload: unknown, kind: ContentKind) {
+function extractServices(payload: unknown, kind: ContentKind): SedifexService[] {
   const serviceKeys = ["publicServices", "services", "serviceItems", "bookableServices", "bookingServices"];
   const catalogKeys = ["items", "products", "publicProducts", "catalog", "publicCatalog", "data", "content"];
   const direct = kind === "services" || kind === "catalog";
@@ -364,18 +364,18 @@ function normalizeBlogPost(raw: unknown, index: number): SedifexBlogPost {
   };
 }
 
-function visibleRecord(raw: unknown) {
+function visibleRecord(raw: unknown): boolean {
   if (!isRecord(raw)) return true;
   const status = readString(raw, ["status", "visibility", "publishStatus", "publish_status"]).toLowerCase();
   return !status || /active|published|public|visible/.test(status);
 }
 
-function isBlogPromo(raw: unknown, post: SedifexBlogPost) {
+function isBlogPromo(raw: unknown, post: SedifexBlogPost): boolean {
   const marker = `${post.category || ""} ${post.title} ${isRecord(raw) ? readString(raw, ["type", "kind", "contentType", "content_type"]) : ""}`.toLowerCase();
   return /blog|post|article|guide|news|story/.test(marker);
 }
 
-function extractBlogPosts(payload: unknown, kind: ContentKind) {
+function extractBlogPosts(payload: unknown, kind: ContentKind): SedifexBlogPost[] {
   const keys = ["blogPosts", "blog_posts", "publicBlogPosts", "public_blog_posts", "posts", "blogs", "articles", "items", "promos", "banners", "data", "content"];
   const items = collectArrays(payload, keys, kind === "blog").flat();
 
@@ -389,7 +389,7 @@ function extractBlogPosts(payload: unknown, kind: ContentKind) {
   );
 }
 
-function firstBlogPayloadItem(payload: unknown) {
+function firstBlogPayloadItem(payload: unknown): unknown | null {
   if (Array.isArray(payload)) return payload[0] || null;
   if (!isRecord(payload)) return null;
 
@@ -437,7 +437,7 @@ export async function getSedifexBlogPost(slug: string): Promise<SedifexBlogPost 
   return getLegacySedifexBlogPost(slug).catch(() => null);
 }
 
-function rawDateValue(record: SedifexRecord) {
+function rawDateValue(record: SedifexRecord): string {
   return readString(record, [
     "startDate",
     "start_date",
@@ -460,25 +460,25 @@ function rawDateValue(record: SedifexRecord) {
   ]);
 }
 
-function rawEndDateValue(record: SedifexRecord) {
+function rawEndDateValue(record: SedifexRecord): string {
   return readString(record, ["endDate", "end_date", "endsAt", "ends_at", "endAt", "end_at", "end", "finishAt", "finish_at"]);
 }
 
-function rawStartTimeValue(record: SedifexRecord, dateValue: string) {
+function rawStartTimeValue(record: SedifexRecord, dateValue: string): string {
   return readString(record, ["startTime", "start_time", "time", "availableTime", "available_time", "slotTime", "slot_time", "hour"]) ||
     extractTimeFromDateTime(dateValue);
 }
 
-function rawEndTimeValue(record: SedifexRecord, endDateValue: string) {
+function rawEndTimeValue(record: SedifexRecord, endDateValue: string): string {
   return readString(record, ["endTime", "end_time", "finishTime", "finish_time"]) || extractTimeFromDateTime(endDateValue);
 }
 
-function extractTimeFromDateTime(value: string) {
+function extractTimeFromDateTime(value: string): string {
   const match = value.match(/(?:T|\s)(\d{1,2}:\d{2})(?::\d{2})?/);
   return match?.[1] || "";
 }
 
-function cleanDateValue(value: string) {
+function cleanDateValue(value: string): string {
   if (!value) return "";
   const dateOnly = value.match(/^(\d{4}-\d{2}-\d{2})/);
   if (dateOnly) return dateOnly[1];
@@ -491,14 +491,14 @@ function cleanDateValue(value: string) {
   return value;
 }
 
-function cleanTimeValue(value: string) {
+function cleanTimeValue(value: string): string {
   if (!value) return "";
   const match = value.match(/(\d{1,2}:\d{2})/);
   if (match) return match[1];
   return value;
 }
 
-function normalizeEventTitle(title: string, serviceName: string, itemName: string, index: number) {
+function normalizeEventTitle(title: string, serviceName: string, itemName: string, index: number): string {
   const selected = title || serviceName || itemName || `Event ${index + 1}`;
   if (/^(?:available\s*)?(?:slot|availability|appointment|booking)$/i.test(selected.trim())) {
     return serviceName || itemName || `Available Session ${index + 1}`;
@@ -542,27 +542,27 @@ function normalizeEvent(raw: unknown, index: number): SedifexEvent {
   };
 }
 
-function visibleEvent(event: SedifexEvent) {
+function visibleEvent(event: SedifexEvent): boolean {
   const status = (event.status || "").trim().toLowerCase();
   return !status || /active|published|upcoming|public|open|available|scheduled|confirmed/.test(status);
 }
 
-function isEventPromo(raw: unknown, event: SedifexEvent) {
+function isEventPromo(raw: unknown, event: SedifexEvent): boolean {
   const marker = `${event.category || ""} ${event.title} ${isRecord(raw) ? readString(raw, ["type", "kind", "contentType", "content_type"]) : ""}`.toLowerCase();
   return /event|webinar|workshop|seminar|session|info session|availability|slot/.test(marker);
 }
 
-function eventTimestamp(event: SedifexEvent) {
+function eventTimestamp(event: SedifexEvent): number {
   const parsed = Date.parse(`${event.startDate || ""} ${event.startTime || ""}`.trim());
   return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
 }
 
-function sortEvents(events: SedifexEvent[]) {
+function sortEvents(events: SedifexEvent[]): SedifexEvent[] {
   return dedupeByKey(events, (event) => event.slug || event.id || `${event.title}-${event.startDate || ""}-${event.startTime || ""}`)
     .sort((left, right) => eventTimestamp(left) - eventTimestamp(right));
 }
 
-function extractEvents(payload: unknown, kind: ContentKind) {
+function extractEvents(payload: unknown, kind: ContentKind): SedifexEvent[] {
   const keys = ["availability", "availabilities", "availableSlots", "available_slots", "slots", "appointments", "bookableSlots", "bookable_slots", "events", "upcomingEvents", "upcoming_events", "calendarEvents", "calendar_events", "eventItems", "event_items", "items", "promos", "banners", "data", "content"];
   const items = collectArrays(payload, keys, kind === "events").flat();
 
