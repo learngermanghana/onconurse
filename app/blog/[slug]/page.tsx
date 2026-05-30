@@ -5,7 +5,10 @@ import { notFound } from "next/navigation";
 import {
   getSedifexBlogPost,
   sanitizeSedifexHtml,
-} from "../../../lib/sedifex-public";
+} from "../../../lib/sedifex-blog";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 function formatDisplayDate(value?: string) {
   if (!value) return "";
