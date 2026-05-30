@@ -23,7 +23,12 @@ export default async function HomePage() {
 
   const hero = slides[0];
   const profile = social?.profile;
-  const heroImageUrl = hero?.imageUrl || profile?.coverImageUrl || "";
+  const heroImageUrl =
+    hero?.imageUrl || hero?.mobileImageUrl || profile?.coverImageUrl || "";
+  const primaryCtaHref = hero?.ctaHref || "/book";
+  const primaryCtaLabel = hero?.ctaLabel || "Book Consultation";
+  const secondaryCtaHref = hero?.secondaryCtaHref || site.mailingListUrl;
+  const secondaryCtaLabel = hero?.secondaryCtaLabel || "Join our mailing list";
 
   const whatsapp = whatsappLink(
     profile?.whatsappNumber || site.whatsapp,
@@ -50,17 +55,17 @@ export default async function HomePage() {
             </p>
 
             <div className="mt-8 flex flex-wrap gap-4">
-              <Link href="/book" className="btn-primary">
-                Book Consultation
+              <Link href={primaryCtaHref} className="btn-primary">
+                {primaryCtaLabel}
               </Link>
 
               <a
-                href={site.mailingListUrl}
-                target="_blank"
-                rel="noreferrer"
+                href={secondaryCtaHref}
+                target={secondaryCtaHref.startsWith("http") ? "_blank" : undefined}
+                rel={secondaryCtaHref.startsWith("http") ? "noreferrer" : undefined}
                 className="btn-secondary"
               >
-                Join our mailing list
+                {secondaryCtaLabel}
               </a>
 
               <a
@@ -120,11 +125,27 @@ export default async function HomePage() {
             </div>
 
             <div className="absolute -bottom-6 -left-6 rounded-3xl bg-white p-6 shadow-xl">
-              <p className="text-sm font-bold text-slate-500">Special focus</p>
+              <p className="text-sm font-bold text-slate-500">
+                {hero?.eyebrow || "Special focus"}
+              </p>
               <p className="mt-1 text-2xl font-black text-emerald-700">
-                Oncology 🩺
+                {profile?.displayName || "Oncology 🩺"}
               </p>
             </div>
+
+            {slides.length > 1 && (
+              <div className="absolute right-8 top-8 flex gap-2 rounded-full bg-white/85 p-2 shadow-lg backdrop-blur">
+                {slides.slice(0, 5).map((slide, index) => (
+                  <span
+                    key={slide.id}
+                    className={`h-2.5 w-2.5 rounded-full ${
+                      index === 0 ? "bg-emerald-700" : "bg-slate-300"
+                    }`}
+                    aria-label={`Hero slide ${index + 1}`}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </section>

@@ -1,19 +1,47 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+
+type BookingServiceOption = {
+  id: string;
+  name: string;
+  price?: number;
+};
 
 type BookingFormProps = {
   initialServiceId?: string;
   initialServiceName?: string;
+  services?: BookingServiceOption[];
 };
 
 export default function BookingForm({
   initialServiceId = "",
   initialServiceName = "",
+  services = [],
 }: BookingFormProps) {
+  const initialService = useMemo(
+    () => services.find((service) => service.id === initialServiceId),
+    [initialServiceId, services]
+  );
   const [status, setStatus] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [serviceName, setServiceName] = useState(initialServiceName);
+  const [selectedServiceId, setSelectedServiceId] = useState(
+    initialService?.id || initialServiceId || "onco-nurse-consultation"
+  );
+  const [serviceName, setServiceName] = useState(
+    initialService?.name || initialServiceName
+  );
+
+  const selectedService = services.find(
+    (service) => service.id === selectedServiceId
+  );
+
+  function updateSelectedService(serviceId: string) {
+    setSelectedServiceId(serviceId);
+
+    const nextService = services.find((service) => service.id === serviceId);
+    if (nextService) setServiceName(nextService.name);
+  }
 
   async function submitBooking(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -27,7 +55,7 @@ export default function BookingForm({
       const response = await fetch("/api/bookings", {
         method: "POST",
         body: JSON.stringify({
-          serviceId: initialServiceId || "onco-nurse-consultation",
+          serviceId: selectedServiceId || "onco-nurse-consultation",
           serviceName: form.get("serviceName"),
           customer: {
             name: form.get("name"),
@@ -41,6 +69,12 @@ export default function BookingForm({
           bookingDate: form.get("bookingDate"),
           bookingTime: form.get("bookingTime"),
           notes: form.get("notes"),
+          paymentAmount: selectedService?.price,
+          attributes: {
+            pageUrl: window.location.href,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            locale: navigator.language,
+          },
         }),
         headers: {
           "Content-Type": "application/json",
@@ -55,9 +89,12 @@ export default function BookingForm({
         setStatus(
           result.demoMode
             ? "Demo booking received. Add Sedifex keys to send bookings into Sedifex."
-            : "Booking received successfully."
+            : `Booking received successfully${
+                result.reference ? ` (${result.reference})` : ""
+              }.`
         );
         event.currentTarget.reset();
+        setSelectedServiceId("onco-nurse-consultation");
         setServiceName("");
       } else {
         setStatus(result.error || "Could not submit booking.");
@@ -79,8 +116,9 @@ export default function BookingForm({
         </h1>
 
         <p className="section-subtitle">
-          Submit your details and Onco-nurse will follow up. When your Sedifex
-          key is added, bookings will go directly into Sedifex.
+          Choose a Sedifex service, request a date and time, and Onco-nurse will
+          follow up. Bookings are submitted to the Sedifex Booking API when your
+          integration key is configured.
         </p>
 
         <div className="mt-8 rounded-3xl bg-slate-950 p-6 text-white">
@@ -101,6 +139,26 @@ export default function BookingForm({
       >
         <div className="grid gap-5 md:grid-cols-2">
           <div className="md:col-span-2">
+            <label className="label">Sedifex service</label>
+            <select
+              name="serviceId"
+              className="input mt-2"
+              value={selectedServiceId}
+              onChange={(e) => updateSelectedService(e.target.value)}
+              required
+            >
+              <option value="onco-nurse-consultation">
+                General Onco-nurse consultation
+              </option>
+              {services.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="md:col-span-2">
             <label className="label">Service / Interest</label>
             <input
               name="serviceName"
@@ -108,6 +166,7 @@ export default function BookingForm({
               value={serviceName}
               onChange={(e) => setServiceName(e.target.value)}
               placeholder="Nursing Ausbildung, FSJ, BFD, Au-Pair, Recognition..."
+              required
             />
           </div>
 
@@ -184,12 +243,12 @@ export default function BookingForm({
 
           <div>
             <label className="label">Preferred date</label>
-            <input name="bookingDate" type="date" className="input mt-2" />
+            <input name="bookingDate" type="date" className="input mt-2" required />
           </div>
 
           <div>
             <label className="label">Preferred time</label>
-            <input name="bookingTime" type="time" className="input mt-2" />
+            <input name="bookingTime" type="time" className="input mt-2" required />
           </div>
 
           <div className="md:col-span-2">
