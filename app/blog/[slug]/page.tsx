@@ -1,20 +1,67 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { getSedifexBlogPosts } from "../../../lib/sedifex";
+import {
+  getSedifexBlogPost,
+  sanitizeSedifexHtml,
+} from "../../../lib/sedifex";
 
-export default async function BlogDetailsPage({
-  params,
-}: {
+function formatDisplayDate(value?: string) {
+  if (!value) return "";
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(date);
+}
+
+type BlogDetailsProps = {
   params: Promise<{ slug: string }>;
-}) {
+};
+
+export async function generateMetadata({
+  params,
+}: BlogDetailsProps): Promise<Metadata> {
   const { slug } = await params;
-  const posts = await getSedifexBlogPosts();
-  const post = posts.find((item) => item.slug === slug);
+  const post = await getSedifexBlogPost(slug);
+
+  if (!post) {
+    return {
+      title: "Blog post not found | Onco-nurse",
+    };
+  }
+
+  return {
+    title: `${post.title} | Onco-nurse Blog`,
+    description: post.excerpt,
+    openGraph: {
+      title: post.title,
+      description: post.excerpt,
+      images: post.imageUrl ? [{ url: post.imageUrl }] : undefined,
+      type: "article",
+    },
+    alternates: {
+      canonical: `/blog/${post.slug}`,
+    },
+  };
+}
+
+export default async function BlogDetailsPage({ params }: BlogDetailsProps) {
+  const { slug } = await params;
+  const post = await getSedifexBlogPost(slug);
 
   if (!post) notFound();
 
-  const content = post.content || post.excerpt || "";
+  const htmlContent = post.contentHtml
+    ? sanitizeSedifexHtml(post.contentHtml)
+    : "";
+  const textContent = post.content || post.excerpt || "";
+  const publishedAt = formatDisplayDate(post.publishedAt);
 
   return (
     <article className="section">
@@ -35,9 +82,9 @@ export default async function BlogDetailsPage({
           </p>
         )}
 
-        {post.publishedAt && (
+        {publishedAt && (
           <p className="mt-5 text-sm font-bold text-slate-500">
-            Published: {post.publishedAt}
+            Published: {publishedAt}
           </p>
         )}
       </div>
@@ -46,7 +93,7 @@ export default async function BlogDetailsPage({
         {post.imageUrl && (
           <Image
             src={post.imageUrl}
-            alt={post.title}
+            alt={post.imageAlt || post.title}
             width={1200}
             height={675}
             sizes="(min-width: 768px) 896px, 100vw"
@@ -54,11 +101,18 @@ export default async function BlogDetailsPage({
           />
         )}
 
-        <div className="space-y-6 text-lg leading-9 text-slate-700">
-          {content.split(/\n{2,}/).map((paragraph) => (
-            <p key={paragraph}>{paragraph}</p>
-          ))}
-        </div>
+        {htmlContent ? (
+          <div
+            className="blog-content text-lg leading-9 text-slate-700"
+            dangerouslySetInnerHTML={{ __html: htmlContent }}
+          />
+        ) : (
+          <div className="space-y-6 text-lg leading-9 text-slate-700">
+            {textContent.split(/\n{2,}/).map((paragraph) => (
+              <p key={paragraph}>{paragraph}</p>
+            ))}
+          </div>
+        )}
 
         <div className="mt-10 rounded-3xl bg-emerald-50 p-6">
           <h2 className="text-2xl font-black text-emerald-900">
