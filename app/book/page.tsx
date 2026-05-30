@@ -1,4 +1,4 @@
-import { getSedifexServices } from "../../lib/sedifex";
+import { formatPrice, getServiceData } from "../../lib/sedifex";
 import BookingForm from "./BookingForm";
 
 type BookPageProps = {
@@ -11,18 +11,22 @@ type BookPageProps = {
 export default async function BookPage({ searchParams }: BookPageProps) {
   const [params, services] = await Promise.all([
     searchParams,
-    getSedifexServices(),
+    getServiceData(),
   ]);
+
+  const serviceOptions = services.map((service) => ({
+    id: service.id,
+    name: service.name,
+    priceLabel: formatPrice(service.price),
+    price: service.price,
+    category: service.category,
+  }));
 
   return (
     <BookingForm
       initialServiceId={params.serviceId}
       initialServiceName={params.serviceName}
-      services={services.map((service) => ({
-        id: service.id,
-        name: service.name,
-        price: service.price,
-      }))}
+      serviceOptions={serviceOptions}
     />
   );
 }
