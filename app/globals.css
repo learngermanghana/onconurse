@@ -138,3 +138,67 @@ a {
     font-size: 3.4rem;
   }
 }
+.blog-content > * + * {
+  margin-top: 1.5rem;
+}
+
+.blog-content h1,
+.blog-content h2,
+.blog-content h3,
+.blog-content h4 {
+  color: #020617;
+  font-weight: 950;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.blog-content h1 {
+  font-size: 2.25rem;
+}
+
+.blog-content h2 {
+  font-size: 1.875rem;
+}
+
+.blog-content h3 {
+  font-size: 1.5rem;
+}
+
+.blog-content h4 {
+  font-size: 1.25rem;
+}
+
+.blog-content a {
+  color: #047857;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.blog-content ul,
+.blog-content ol {
+  padding-left: 1.5rem;
+}
+
+.blog-content ul {
+  list-style: disc;
+}
+
+.blog-content ol {
+  list-style: decimal;
+}
+
+.blog-content blockquote {
+  border-left: 4px solid #10b981;
+  border-radius: 0 1rem 1rem 0;
+  background: #ecfdf5;
+  padding: 1rem 1.25rem;
+  color: #064e3b;
+  font-weight: 700;
+}
+
+.blog-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 1.5rem;
+}
