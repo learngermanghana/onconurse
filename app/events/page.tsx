@@ -58,12 +58,12 @@ export default async function EventsPage() {
           <span className="badge">Onco-nurse Events</span>
 
           <h1 className="mt-6 max-w-4xl text-5xl font-black tracking-tight text-slate-950 md:text-7xl">
-            Upcoming webinars, sessions and availability
+            Upcoming webinars, events and sessions
           </h1>
 
           <p className="mt-6 max-w-3xl text-xl leading-9 text-slate-700">
-            View Onco-nurse events and available Sedifex booking sessions in a
-            clean schedule format.
+            View Onco-nurse events, webinars and available sessions in one simple
+            schedule. Register your interest or book directly when a session is open.
           </p>
         </div>
       </section>
@@ -71,11 +71,12 @@ export default async function EventsPage() {
       <section className="section">
         <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
           <div>
-            <span className="badge">Sedifex Schedule</span>
+            <span className="badge">Event Schedule</span>
             <h2 className="section-title mt-4">Available Sessions</h2>
             <p className="section-subtitle">
-              Manual upcoming events, images, dates, times and seats are pulled
-              from Sedifex availability slots.
+              See the event photo, date, time, location and available spaces.
+              If the date or time is not confirmed yet, you can still register
+              your interest and our team will follow up.
             </p>
           </div>
 
@@ -206,8 +207,8 @@ export default async function EventsPage() {
               No events available yet
             </h3>
             <p className="mx-auto mt-3 max-w-2xl text-slate-600">
-              When events or availability sessions are added in Sedifex, they
-              will appear here automatically.
+              When new events, webinars or consultation sessions are available,
+              they will appear here automatically.
             </p>
             <Link href="/book" className="mt-6 inline-flex btn-primary">
               Book Consultation
