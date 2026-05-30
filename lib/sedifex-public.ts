@@ -78,7 +78,7 @@ function normalizeKey(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function readString(record: SedifexRecord, keys: string[], fallback = "") {
+function readString(record: SedifexRecord, keys: string[], fallback = ""): string {
   for (const key of keys) {
     const value = record[key];
     if (typeof value === "string" && value.trim()) return value.trim();
@@ -225,6 +225,12 @@ const preferredServiceNames = [
   "consultation",
 ];
 
+function preferredServiceIndex(service: SedifexService) {
+  const searchable = `${service.name} ${service.category || ""}`.toLowerCase();
+  const index = preferredServiceNames.findIndex((name) => searchable.includes(name));
+  return index === -1 ? Number.POSITIVE_INFINITY : index;
+}
+
 function isProbablyService(raw: unknown) {
   if (!isRecord(raw)) return false;
 
@@ -275,11 +281,8 @@ function sortServices(services: SedifexService[]) {
   return dedupeByKey(services, (service) => service.slug || service.id || service.name)
     .map((service, index) => ({ service, index }))
     .sort((left, right) => {
-      const preferredDelta =
-        preferredServiceNames.findIndex((name) => `${left.service.name} ${left.service.category || ""}`.toLowerCase().includes(name)) -
-        preferredServiceNames.findIndex((name) => `${right.service.name} ${right.service.category || ""}`.toLowerCase().includes(name));
-
-      if (preferredDelta && Math.abs(preferredDelta) !== preferredServiceNames.length) return preferredDelta;
+      const preferredDelta = preferredServiceIndex(left.service) - preferredServiceIndex(right.service);
+      if (preferredDelta) return preferredDelta;
 
       const leftOrder = left.service.sortOrder ?? left.service.order;
       const rightOrder = right.service.sortOrder ?? right.service.order;
