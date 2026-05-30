@@ -53,12 +53,22 @@ export type SedifexBlogPost = {
 
 export type SedifexHeroSlide = {
   id: string;
+  storeId?: string;
   title?: string;
   eyebrow?: string;
   subtitle?: string;
   ctaLabel?: string;
   ctaHref?: string;
+  secondaryCtaLabel?: string;
+  secondaryCtaHref?: string;
   imageUrl?: string;
+  mobileImageUrl?: string;
+  accent?: string;
+  textColor?: string;
+  overlayStyle?: string;
+  layout?: string;
+  priority?: number;
+  updatedAt?: string;
 };
 
 export type SedifexEvent = {
@@ -82,21 +92,48 @@ export type SedifexProfile = {
   displayName?: string;
   tagline?: string;
   businessDescription?: string;
+  openingHours?: string;
+  brandColor?: string;
   logoUrl?: string;
   coverImageUrl?: string;
+  socialShareImage?: string;
   publicPhone?: string;
   whatsappNumber?: string;
+  telegramNumber?: string;
   publicEmail?: string;
+  addressLine1?: string;
+  city?: string;
+  country?: string;
+  websiteUrl?: string;
   instagramHandle?: string;
+  facebookUrl?: string;
+  tiktokHandle?: string;
+  youtubeUrl?: string;
+  xHandle?: string;
+  linkedinUrl?: string;
+  updatedAt?: string;
 };
 
+export type SedifexSocialSettings = {
+  profile?: SedifexProfile;
+  socialLinks?: Partial<
+    Record<
+      "website" | "instagram" | "facebook" | "tiktok" | "youtube" | "x" | "linkedin",
+      string
+    >
+  >;
+};
+
+function hasUsableValue(value: string) {
+  return Boolean(value && !value.includes("PASTE_") && !value.includes("YOUR_"));
+}
+
+export function isSedifexStoreConfigured() {
+  return hasUsableValue(SEDIFEX_STORE_ID);
+}
+
 export function isSedifexConfigured() {
-  return Boolean(
-    SEDIFEX_STORE_ID &&
-      SEDIFEX_API_KEY &&
-      !SEDIFEX_STORE_ID.includes("PASTE_") &&
-      !SEDIFEX_API_KEY.includes("PASTE_")
-  );
+  return isSedifexStoreConfigured() && hasUsableValue(SEDIFEX_API_KEY);
 }
 
 function sedifexHeaders(contentType = false) {
@@ -113,9 +150,10 @@ async function sedifexGet<T>(
   path: string,
   params: Record<string, string> = {},
   revalidate = 60,
-  silentErrors = false
+  silentErrors = false,
+  authenticated = true
 ): Promise<T | null> {
-  if (!isSedifexConfigured()) return null;
+  if (!isSedifexStoreConfigured() || (authenticated && !isSedifexConfigured())) return null;
 
   const url = new URL(path, SEDIFEX_BASE_URL);
   url.searchParams.set("storeId", SEDIFEX_STORE_ID);
@@ -125,7 +163,7 @@ async function sedifexGet<T>(
   });
 
   const response = await fetch(url, {
-    headers: sedifexHeaders(),
+    headers: authenticated ? sedifexHeaders() : { Accept: "application/json" },
     next: { revalidate },
   });
 
@@ -171,22 +209,47 @@ async function sedifexPost<T>(path: string, body: unknown): Promise<T> {
   return response.json();
 }
 
-export async function getSedifexServices(): Promise<SedifexService[]> {
-  const payload = await sedifexGet<{
-    products?: SedifexService[];
-    publicServices?: SedifexService[];
-  }>("/v1IntegrationProducts", {}, 30);
+function serviceItemsFromPayload(payload: unknown): SedifexService[] {
+  if (!isRecord(payload)) return [];
 
-  const items = (payload?.publicServices?.length
-    ? payload.publicServices
-    : payload?.products?.length
-    ? payload.products
-    : fallbackServices) as SedifexService[];
+  const candidates = [
+    payload.products,
+    payload.publicServices,
+    payload.services,
+    payload.items,
+    payload.data,
+  ];
 
-  return items.filter((item) => {
-    const marker = `${item.itemType || ""} ${item.type || ""}`.toLowerCase();
-    return marker.includes("service");
+  const items = candidates.find((value) => Array.isArray(value));
+  if (!Array.isArray(items)) return [];
+
+  return (items as SedifexService[]).filter((item) => {
+    const itemType = (item.itemType || "").toLowerCase();
+    const type = (item.type || "").toUpperCase();
+    return itemType === "service" || type === "SERVICE";
   });
+}
+
+export async function getSedifexServices(): Promise<SedifexService[]> {
+  const integrationPayload = await sedifexGet<unknown>(
+    "/v1IntegrationProducts",
+    {},
+    30
+  );
+  const integrationServices = serviceItemsFromPayload(integrationPayload);
+
+  if (integrationServices.length) return integrationServices;
+
+  const publicPayload = await sedifexGet<unknown>(
+    "/publicQuickPayCatalog",
+    {},
+    30,
+    true,
+    false
+  );
+  const publicServices = serviceItemsFromPayload(publicPayload);
+
+  return publicServices.length ? publicServices : fallbackServices;
 }
 
 export async function getSedifexHeroSlides(): Promise<SedifexHeroSlide[]> {
@@ -199,9 +262,7 @@ export async function getSedifexHeroSlides(): Promise<SedifexHeroSlide[]> {
   return payload?.slides || [];
 }
 
-export async function getSedifexSocialSettings(): Promise<{
-  profile?: SedifexProfile;
-} | null> {
+export async function getSedifexSocialSettings(): Promise<SedifexSocialSettings | null> {
   return sedifexGet("/v1IntegrationSocialSettings", {}, 60);
 }
 
@@ -444,13 +505,14 @@ export async function createSedifexBooking(input: {
   notes?: string;
   paymentMethod?: string;
   paymentAmount?: number;
+  sourceChannel?: string;
   attributes?: Record<string, unknown>;
 }) {
   return sedifexPost("/v1IntegrationBookings", {
     ...input,
     quantity: input.quantity || 1,
     paymentMethod: input.paymentMethod || "manual",
-    sourceChannel: "client_website",
+    sourceChannel: input.sourceChannel || "client_website",
     attributes: {
       source: "website_booking_form",
       sourceLabel: "Onco-nurse website",

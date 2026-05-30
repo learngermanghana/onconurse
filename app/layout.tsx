@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { site } from "../lib/site";
-import { whatsappLink } from "../lib/sedifex";
+import {
+  getSedifexSocialSettings,
+  type SedifexSocialSettings,
+  whatsappLink,
+} from "../lib/sedifex";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -10,21 +15,34 @@ export const metadata: Metadata = {
     "Helping African nurses navigate Nursing Ausbildung in Germany, FSJ, BFD, Au-Pair, Recognition and Student Visa support.",
 };
 
-function Header() {
+function Header({ social }: { social: SedifexSocialSettings | null }) {
+  const profile = social?.profile;
+  const brandName = profile?.displayName || site.name;
+
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-4">
         <Link href="/" className="flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-emerald-700 text-lg font-black text-white">
-            ON
-          </div>
+          {profile?.logoUrl ? (
+            <Image
+              src={profile.logoUrl}
+              alt={`${brandName} logo`}
+              width={44}
+              height={44}
+              className="h-11 w-11 rounded-2xl object-cover"
+            />
+          ) : (
+            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-emerald-700 text-lg font-black text-white">
+              ON
+            </div>
+          )}
 
           <div>
             <p className="text-lg font-black tracking-tight text-slate-950">
-              Onco-nurse
+              {brandName}
             </p>
             <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
-              🇩🇪 🇬🇭 Oncology • Germany Nursing
+              {profile?.tagline || "🇩🇪 🇬🇭 Oncology • Germany Nursing"}
             </p>
           </div>
         </Link>
@@ -61,16 +79,35 @@ function Header() {
   );
 }
 
-function Footer() {
+function Footer({ social }: { social: SedifexSocialSettings | null }) {
+  const profile = social?.profile;
+  const socialLinks = social?.socialLinks || {};
+  const contactLines = [
+    profile?.publicEmail || site.email,
+    profile?.publicPhone || site.phone,
+    profile?.whatsappNumber ? `WhatsApp: ${profile.whatsappNumber}` : "",
+    [profile?.addressLine1, profile?.city, profile?.country]
+      .filter(Boolean)
+      .join(", "),
+  ].filter(Boolean);
+  const renderedSocialLinks = Object.entries(socialLinks).flatMap(([key, href]) =>
+    href ? [{ key, href }] : []
+  );
+
   return (
     <footer className="border-t border-slate-200 bg-slate-950 text-white">
       <div className="mx-auto grid max-w-7xl gap-8 px-5 py-12 md:grid-cols-4">
         <div className="md:col-span-2">
-          <p className="text-2xl font-black">Onco-nurse</p>
+          <p className="text-2xl font-black">{profile?.displayName || site.name}</p>
           <p className="mt-3 max-w-xl text-slate-300">
-            Helping African nurses navigate Nursing Ausbildung, FSJ, BFD,
-            Au-Pair, Recognition and Student Visa pathways in Germany.
+            {profile?.businessDescription ||
+              "Helping African nurses navigate Nursing Ausbildung, FSJ, BFD, Au-Pair, Recognition and Student Visa pathways in Germany."}
           </p>
+          {profile?.openingHours && (
+            <p className="mt-4 text-sm font-semibold text-emerald-100">
+              {profile.openingHours}
+            </p>
+          )}
         </div>
 
         <div>
@@ -90,9 +127,14 @@ function Footer() {
         <div>
           <p className="font-bold">Contact</p>
           <div className="mt-4 grid gap-2 text-sm text-slate-300">
-            <span>{site.email}</span>
-            <span>{site.phone}</span>
-            <span>@{site.handle}</span>
+            {contactLines.map((line) => (
+              <span key={line}>{line}</span>
+            ))}
+            {renderedSocialLinks.map(({ key, href }) => (
+              <a key={key} href={href} target="_blank" rel="noreferrer">
+                {key[0].toUpperCase() + key.slice(1)}
+              </a>
+            ))}
           </div>
         </div>
       </div>
@@ -100,13 +142,14 @@ function Footer() {
   );
 }
 
-function FloatingWhatsApp() {
+function FloatingWhatsApp({ social }: { social: SedifexSocialSettings | null }) {
   const message =
     "Hello Onco-nurse, I want guidance for Germany nursing pathway.";
+  const whatsappNumber = social?.profile?.whatsappNumber || site.whatsapp;
 
   return (
     <a
-      href={whatsappLink(site.whatsapp, message)}
+      href={whatsappLink(whatsappNumber, message)}
       target="_blank"
       rel="noreferrer"
       className="fixed bottom-6 right-6 z-50 rounded-full bg-emerald-700 px-5 py-4 text-sm font-black text-white shadow-2xl hover:bg-emerald-800"
@@ -116,18 +159,20 @@ function FloatingWhatsApp() {
   );
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const social = await getSedifexSocialSettings();
+
   return (
     <html lang="en">
       <body>
-        <Header />
+        <Header social={social} />
         <main>{children}</main>
-        <Footer />
-        <FloatingWhatsApp />
+        <Footer social={social} />
+        <FloatingWhatsApp social={social} />
       </body>
     </html>
   );

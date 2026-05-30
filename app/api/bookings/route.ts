@@ -17,6 +17,17 @@ function getNestedRecord(record: JsonRecord, key: string) {
   return isRecord(value) ? value : {};
 }
 
+function getNumber(record: JsonRecord, key: string) {
+  const value = record[key];
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+
+  return undefined;
+}
+
 export async function POST(request: Request) {
   try {
     const payload: unknown = await request.json();
@@ -34,12 +45,25 @@ export async function POST(request: Request) {
     const germanLevel = getString(body, "germanLevel");
     const nursingBackground = getString(body, "nursingBackground");
     const notes = getString(body, "notes");
+    const bookingDate = getString(body, "bookingDate");
+    const bookingTime = getString(body, "bookingTime");
+    const attributesInput = getNestedRecord(body, "attributes");
 
     if (!customer.name || !customer.phone) {
       return NextResponse.json(
         {
           ok: false,
           error: "Name and phone are required.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!bookingDate || !bookingTime) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Preferred date and time are required.",
         },
         { status: 400 }
       );
@@ -58,8 +82,8 @@ export async function POST(request: Request) {
     const result = await createSedifexBooking({
       serviceId: getString(body, "serviceId") || "onco-nurse-consultation",
       serviceName: getString(body, "serviceName") || "Onco-nurse Consultation",
-      bookingDate: getString(body, "bookingDate"),
-      bookingTime: getString(body, "bookingTime"),
+      bookingDate,
+      bookingTime,
       quantity: 1,
       customer,
       notes: [
@@ -72,8 +96,14 @@ export async function POST(request: Request) {
         .filter(Boolean)
         .join("\n"),
       paymentMethod: "manual",
+      paymentAmount: getNumber(body, "paymentAmount"),
+      sourceChannel: "client_website",
       attributes: {
-        source: "onco_nurse_website",
+        source: "website_booking_form",
+        sourceLabel: "Onco-nurse website",
+        pageUrl: getString(attributesInput, "pageUrl"),
+        timezone: getString(attributesInput, "timezone") || "Africa/Accra",
+        locale: getString(attributesInput, "locale") || "en-GB",
         country,
         pathway,
         germanLevel,
