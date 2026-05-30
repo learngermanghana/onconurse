@@ -1,25 +1,25 @@
-import { fallbackBlogPosts, fallbackServices } from "./site";
+import { fallbackBlogPosts, fallbackServices, site } from "./site";
 
 const SEDIFEX_BASE_URL =
   process.env.SEDIFEX_INTEGRATION_API_BASE_URL ||
   process.env.SEDIFEX_API_BASE_URL ||
   "https://us-central1-sedifex-web.cloudfunctions.net";
 
-const SEDIFEX_PUBLIC_BLOG_URL =
-  process.env.SEDIFEX_PUBLIC_BLOG_URL ||
-  process.env.NEXT_PUBLIC_SEDIFEX_PUBLIC_BLOG_URL ||
-  "https://www.sedifex.com/api/public-blog";
+const SEDIFEX_PUBLIC_API_BASE_URL =
+  process.env.SEDIFEX_PUBLIC_API_BASE_URL ||
+  process.env.NEXT_PUBLIC_SEDIFEX_PUBLIC_API_BASE_URL ||
+  "https://sedifex.com";
 
 const SEDIFEX_STORE_ID =
   process.env.SEDIFEX_STORE_ID ||
   process.env.SEDIFEX_BOOKING_TARGET_STORE_ID ||
   "";
 
-const SEDIFEX_PUBLIC_BLOG_STORE_ID =
-  process.env.SEDIFEX_PUBLIC_BLOG_STORE_ID ||
-  process.env.NEXT_PUBLIC_SEDIFEX_PUBLIC_BLOG_STORE_ID ||
-  process.env.SEDIFEX_STORE_ID ||
-  "YvRddOFEYlhYoNrwqSyHwShPioR2";
+const SEDIFEX_STORE_SLUG =
+  process.env.SEDIFEX_STORE_SLUG ||
+  process.env.SEDIFEX_PUBLIC_STORE_SLUG ||
+  process.env.NEXT_PUBLIC_SEDIFEX_STORE_SLUG ||
+  slugify(site.name);
 
 const SEDIFEX_API_KEY =
   process.env.SEDIFEX_INTEGRATION_API_KEY ||
@@ -195,16 +195,15 @@ async function sedifexGet<T>(
 }
 
 async function sedifexPublicBlogGet<T>(
+  path: string,
   params: Record<string, string> = {},
   revalidate = 60,
   silentErrors = true
 ): Promise<T | null> {
-  if (!hasUsableValue(SEDIFEX_PUBLIC_BLOG_STORE_ID)) return null;
+  if (!hasUsableValue(SEDIFEX_STORE_SLUG)) return null;
 
-  const url = new URL(SEDIFEX_PUBLIC_BLOG_URL);
-  if (!url.searchParams.has("storeId")) {
-    url.searchParams.set("storeId", SEDIFEX_PUBLIC_BLOG_STORE_ID);
-  }
+  const url = new URL(path, SEDIFEX_PUBLIC_API_BASE_URL);
+  url.searchParams.set("storeSlug", SEDIFEX_STORE_SLUG);
 
   Object.entries(params).forEach(([key, value]) => {
     if (value) url.searchParams.set(key, value);
@@ -219,7 +218,7 @@ async function sedifexPublicBlogGet<T>(
     if (!response.ok) {
       if (!silentErrors) {
         console.error("Sedifex public blog GET failed", {
-          url: url.toString(),
+          path,
           status: response.status,
           requestId: response.headers.get("x-sedifex-request-id"),
         });
@@ -230,10 +229,7 @@ async function sedifexPublicBlogGet<T>(
     return response.json();
   } catch (error) {
     if (!silentErrors) {
-      console.error("Sedifex public blog GET failed", {
-        url: url.toString(),
-        error,
-      });
+      console.error("Sedifex public blog GET failed", { path, error });
     }
 
     return null;
@@ -539,6 +535,17 @@ function normalizeBlogPost(raw: unknown, index: number): SedifexBlogPost {
   };
 }
 
+function firstPayloadItem(payload: unknown): unknown | null {
+  if (Array.isArray(payload)) return payload[0] || null;
+  if (!isRecord(payload)) return null;
+
+  const direct = payload.post || payload.blogPost || payload.item || payload.data;
+  if (direct && !Array.isArray(direct)) return direct;
+  if (typeof payload.title === "string") return payload;
+
+  return pickArray(payload)[0] || null;
+}
+
 export function sanitizeSedifexHtml(html: string) {
   return html
     .replace(
@@ -554,18 +561,15 @@ export function sanitizeSedifexHtml(html: string) {
     });
 }
 
-async function getSedifexPublicBlogPosts(
-  limit = "20"
-): Promise<SedifexBlogPost[]> {
-  const publicPayload = await sedifexPublicBlogGet<unknown>({ limit }, 60);
-
-  return pickArray(publicPayload)
+export async function getSedifexBlogPosts(): Promise<SedifexBlogPost[]> {
+  const publicPayload = await sedifexPublicBlogGet<unknown>(
+    "/api/public/blog",
+    { limit: "20" },
+    60
+  );
+  const publicPosts = pickArray(publicPayload)
     .map(normalizeBlogPost)
     .filter((post) => post.title && post.slug);
-}
-
-export async function getSedifexBlogPosts(): Promise<SedifexBlogPost[]> {
-  const publicPosts = await getSedifexPublicBlogPosts();
 
   if (publicPosts.length) return publicPosts;
 
@@ -589,10 +593,17 @@ export async function getSedifexBlogPosts(): Promise<SedifexBlogPost[]> {
 }
 
 export async function getSedifexBlogPost(slug: string): Promise<SedifexBlogPost | null> {
-  const publicPosts = await getSedifexPublicBlogPosts("100");
-  const publicPost = publicPosts.find((item) => item.slug === slug);
+  const publicPayload = await sedifexPublicBlogGet<unknown>(
+    `/api/public/blog/${encodeURIComponent(slug)}`,
+    {},
+    60
+  );
+  const publicPost = firstPayloadItem(publicPayload);
 
-  if (publicPost) return publicPost;
+  if (publicPost) {
+    const normalized = normalizeBlogPost(publicPost, 0);
+    if (normalized.title) return normalized;
+  }
 
   const posts = await getSedifexBlogPosts();
   return posts.find((item) => item.slug === slug) || null;

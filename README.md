@@ -18,30 +18,23 @@ The public blog pages use Sedifex's public blog API first, then fall back to old
 Configure these environment variables in `.env.local` or your hosting provider:
 
 ```bash
-# Public blog pull. These defaults already point to the Onco-nurse Sedifex
-# blog feed: https://www.sedifex.com/api/public-blog?storeId=YvRddOFEYlhYoNrwqSyHwShPioR2
-# Override only if Sedifex gives you a different public blog URL or store ID.
-SEDIFEX_PUBLIC_BLOG_URL=https://www.sedifex.com/api/public-blog
-SEDIFEX_PUBLIC_BLOG_STORE_ID=YvRddOFEYlhYoNrwqSyHwShPioR2
+# Required for public blog pull. Defaults to onco-nurse if omitted.
+SEDIFEX_STORE_SLUG=onco-nurse
+
+# Optional. Defaults to https://sedifex.com for /api/public/blog.
+SEDIFEX_PUBLIC_API_BASE_URL=https://sedifex.com
 
 # Optional legacy/private integrations used by services, social settings, bookings,
-# events, and as a secondary blog fallback. Get these from the Sedifex dashboard
-# or integration/API settings for the store.
+# events, and as a secondary blog fallback.
 SEDIFEX_STORE_ID=your-store-id
 SEDIFEX_INTEGRATION_API_KEY=your-integration-key
 SEDIFEX_INTEGRATION_API_BASE_URL=https://us-central1-sedifex-web.cloudfunctions.net
 ```
 
-### Sedifex public blog values
-
-- `SEDIFEX_PUBLIC_BLOG_URL`: the Sedifex public blog endpoint. For this site it is `https://www.sedifex.com/api/public-blog`.
-- `SEDIFEX_PUBLIC_BLOG_STORE_ID`: the `storeId` query value from the Sedifex URL. For this site it is `YvRddOFEYlhYoNrwqSyHwShPioR2`.
-- Full feed URL: `https://www.sedifex.com/api/public-blog?storeId=YvRddOFEYlhYoNrwqSyHwShPioR2`.
-
 Blog requests follow this Sedifex contract:
 
-- List posts: `GET /api/public-blog?storeId=<storeId>`
-- Single post: the site loads the public feed and matches the requested post slug locally.
+- List posts: `GET /api/public/blog?storeSlug=<slug>&limit=20`
+- Single post: `GET /api/public/blog/:postSlug?storeSlug=<slug>`
 
 The site renders the list at `/blog` and each pulled post at `/blog/[slug]`.
 
