@@ -1,3 +1,4 @@
+import { fallbackServices } from "./site";
 import { slugify, type SedifexService } from "./sedifex";
 
 const DEFAULT_SEDIFEX_API_BASE_URL =
@@ -17,8 +18,8 @@ const SEDIFEX_STORE_ID =
 const SEDIFEX_API_KEY =
   process.env.SEDIFEX_INTEGRATION_API_KEY ||
   process.env.SEDIFEX_PRODUCTS_API_KEY ||
-  process.env.SEDIFEX_INTEGRATION_KEY ||
   process.env.SEDIFEX_BOOKING_API_KEY ||
+  process.env.SEDIFEX_INTEGRATION_KEY ||
   "";
 
 const SEDIFEX_CONTRACT_VERSION =
@@ -26,11 +27,20 @@ const SEDIFEX_CONTRACT_VERSION =
 
 type JsonRecord = Record<string, unknown>;
 
-type ProductsResponse = {
+type SedifexProductsResponse = {
   ok?: boolean;
   storeId?: string;
   count?: number;
   products?: unknown[];
+  publicProducts?: unknown[];
+  publicServices?: unknown[];
+};
+
+type SedifexCatalogResponse = {
+  ok?: boolean;
+  storeId?: string;
+  count?: number;
+  items?: unknown[];
 };
 
 function hasUsableValue(value?: string) {
@@ -67,22 +77,39 @@ function readNumber(record: JsonRecord, keys: string[]) {
 function readStringArray(record: JsonRecord, keys: string[]) {
   for (const key of keys) {
     const value = record[key];
-    if (Array.isArray(value)) {
-      return value.filter(
-        (item): item is string => typeof item === "string" && Boolean(item.trim())
-      );
-    }
+    if (!Array.isArray(value)) continue;
+
+    return value.filter(
+      (item): item is string => typeof item === "string" && Boolean(item.trim())
+    );
   }
 
   return [];
 }
 
-function isServiceProduct(item: unknown) {
+function isServiceItem(item: unknown) {
   if (!isRecord(item)) return false;
-  return readString(item, ["itemType"]).toLowerCase() === "service";
+  const itemType = readString(item, ["itemType", "type"]).toLowerCase();
+  return itemType === "service";
 }
 
-function mapServiceProduct(raw: unknown, index: number): SedifexService | null {
+function cleanCategory(category: string) {
+  return /^not provided$/i.test(category.trim()) ? "" : category.trim();
+}
+
+function normalizeServiceDescription(description: string) {
+  return description
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\*\*/g, "").trim())
+    .filter((line) => line && !/^(?:product\s*name|item\s*type|category)\s*:/i.test(line))
+    .filter((line) => !/^not provided$/i.test(line))
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .replace(/\s+([.,;:!?])/g, "$1")
+    .trim();
+}
+
+function mapSedifexItem(raw: unknown, index: number): SedifexService | null {
   if (!isRecord(raw)) return null;
 
   const imageUrls = readStringArray(raw, ["imageUrls"]);
@@ -94,8 +121,8 @@ function mapServiceProduct(raw: unknown, index: number): SedifexService | null {
     slug: readString(raw, ["slug"]) || slugify(name),
     storeId: readString(raw, ["storeId"]) || undefined,
     name,
-    category: readString(raw, ["category", "categoryName"]),
-    description: readString(raw, ["description"]),
+    category: cleanCategory(readString(raw, ["category", "categoryName"])),
+    description: normalizeServiceDescription(readString(raw, ["description"])),
     price: readNumber(raw, ["price"]),
     priceMinor: readNumber(raw, ["priceMinor"]),
     stockCount: readNumber(raw, ["stockCount"]) ?? null,
@@ -106,69 +133,145 @@ function mapServiceProduct(raw: unknown, index: number): SedifexService | null {
     imageAlt: readString(raw, ["imageAlt"], name),
     updatedAt: readString(raw, ["updatedAt"]) || undefined,
     tag: readString(raw, ["tag", "badge", "label"]) || undefined,
-    sortOrder: readNumber(raw, ["sortOrder", "order", "position"]),
+    sortOrder: readNumber(raw, ["sortOrder"]),
     order: readNumber(raw, ["order"]),
   };
 }
 
-function sortServices(services: SedifexService[]) {
-  return [...services].sort((left, right) => {
-    const leftOrder = left.sortOrder ?? left.order;
-    const rightOrder = right.sortOrder ?? right.order;
+const preferredServiceNames = [
+  "nursing ausbildung",
+  "ausbildung",
+  "fsj",
+  "bfd",
+  "au-pair",
+  "au pair",
+  "recognition",
+  "student visa",
+  "document review",
+  "consultation",
+];
 
-    if (leftOrder !== undefined || rightOrder !== undefined) {
-      return (leftOrder ?? Number.POSITIVE_INFINITY) -
-        (rightOrder ?? Number.POSITIVE_INFINITY);
-    }
-
-    return left.name.localeCompare(right.name);
-  });
+function preferredServiceIndex(service: SedifexService) {
+  const searchable = `${service.name} ${service.category || ""}`.toLowerCase();
+  const index = preferredServiceNames.findIndex((name) => searchable.includes(name));
+  return index === -1 ? Number.POSITIVE_INFINITY : index;
 }
 
-export async function getOncoNurseServices(): Promise<SedifexService[]> {
+function sortSedifexServices(services: SedifexService[]) {
+  return services
+    .map((service, index) => ({ service, index }))
+    .sort((left, right) => {
+      const preferredDelta =
+        preferredServiceIndex(left.service) - preferredServiceIndex(right.service);
+      if (Number.isFinite(preferredDelta) && preferredDelta !== 0) {
+        return preferredDelta;
+      }
+
+      const leftOrder = left.service.sortOrder ?? left.service.order;
+      const rightOrder = right.service.sortOrder ?? right.service.order;
+
+      if (leftOrder !== undefined || rightOrder !== undefined) {
+        return (leftOrder ?? Number.POSITIVE_INFINITY) -
+          (rightOrder ?? Number.POSITIVE_INFINITY);
+      }
+
+      return left.index - right.index;
+    })
+    .map(({ service }) => service);
+}
+
+async function fetchIntegrationProducts() {
   if (!hasUsableValue(SEDIFEX_STORE_ID) || !hasUsableValue(SEDIFEX_API_KEY)) {
     return [];
   }
 
-  const url = new URL("/v1IntegrationProducts", SEDIFEX_BASE_URL);
-  url.searchParams.set("storeId", SEDIFEX_STORE_ID);
+  const endpoint = new URL("/v1IntegrationProducts", SEDIFEX_BASE_URL);
+  endpoint.searchParams.set("storeId", SEDIFEX_STORE_ID);
 
+  const response = await fetch(endpoint, {
+    headers: {
+      "x-api-key": SEDIFEX_API_KEY,
+      Authorization: `Bearer ${SEDIFEX_API_KEY}`,
+      "X-Sedifex-Contract-Version": SEDIFEX_CONTRACT_VERSION,
+      Accept: "application/json",
+    },
+    next: { revalidate: 30 },
+  });
+
+  if (!response.ok) return [];
+
+  const payload = (await response.json()) as SedifexProductsResponse;
+  const publicServices = Array.isArray(payload.publicServices)
+    ? payload.publicServices
+    : [];
+
+  if (publicServices.length) {
+    return publicServices
+      .filter(isServiceItem)
+      .map(mapSedifexItem)
+      .filter((service): service is SedifexService => Boolean(service));
+  }
+
+  const products = Array.isArray(payload.products) ? payload.products : [];
+
+  return products
+    .filter(isServiceItem)
+    .map(mapSedifexItem)
+    .filter((service): service is SedifexService => Boolean(service));
+}
+
+async function fetchPublicQuickPayCatalog() {
+  if (!hasUsableValue(SEDIFEX_STORE_ID)) return [];
+
+  const endpoint = new URL("/publicQuickPayCatalog", SEDIFEX_BASE_URL);
+  endpoint.searchParams.set("storeId", SEDIFEX_STORE_ID);
+
+  const response = await fetch(endpoint, {
+    headers: { Accept: "application/json" },
+    next: { revalidate: 30 },
+  });
+
+  if (!response.ok) return [];
+
+  const payload = (await response.json()) as SedifexCatalogResponse;
+  const items = Array.isArray(payload.items) ? payload.items : [];
+
+  return items
+    .filter(isServiceItem)
+    .map(mapSedifexItem)
+    .filter((service): service is SedifexService => Boolean(service));
+}
+
+function localFallbackServices() {
+  return fallbackServices
+    .map(mapSedifexItem)
+    .filter((service): service is SedifexService => Boolean(service));
+}
+
+export async function getServiceData(): Promise<SedifexService[]> {
   try {
-    const response = await fetch(url, {
-      headers: {
-        "x-api-key": SEDIFEX_API_KEY,
-        Authorization: `Bearer ${SEDIFEX_API_KEY}`,
-        "X-Sedifex-Contract-Version": SEDIFEX_CONTRACT_VERSION,
-        Accept: "application/json",
-      },
-      next: { revalidate: 30 },
-    });
-
-    if (!response.ok) {
-      console.error("Sedifex service products failed", {
-        status: response.status,
-        requestId: response.headers.get("x-sedifex-request-id"),
-      });
-      return [];
+    const integrationServices = await fetchIntegrationProducts();
+    if (integrationServices.length) {
+      return sortSedifexServices(integrationServices);
     }
 
-    const payload = (await response.json()) as ProductsResponse;
-    const products = Array.isArray(payload.products) ? payload.products : [];
-
-    return sortServices(
-      products
-        .filter(isServiceProduct)
-        .map(mapServiceProduct)
-        .filter((service): service is SedifexService => Boolean(service))
-    );
+    const publicServices = await fetchPublicQuickPayCatalog();
+    if (publicServices.length) {
+      return sortSedifexServices(publicServices);
+    }
   } catch (error) {
-    console.error("Sedifex service products failed", { error });
-    return [];
+    console.error("Unable to fetch Sedifex services", { error });
   }
+
+  return sortSedifexServices(localFallbackServices());
+}
+
+export async function getOncoNurseServices() {
+  return getServiceData();
 }
 
 export async function getOncoNurseService(slug: string) {
-  const services = await getOncoNurseServices();
+  const services = await getServiceData();
 
   return (
     services.find(
