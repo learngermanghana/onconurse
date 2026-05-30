@@ -78,7 +78,7 @@ function normalizeKey(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function readString(record: SedifexRecord, keys: string[], fallback = ""): string {
+function readString(record: SedifexRecord, keys: string[], fallback = "") {
   for (const key of keys) {
     const value = record[key];
     if (typeof value === "string" && value.trim()) return value.trim();
@@ -282,7 +282,7 @@ function sortServices(services: SedifexService[]) {
     .map((service, index) => ({ service, index }))
     .sort((left, right) => {
       const preferredDelta = preferredServiceIndex(left.service) - preferredServiceIndex(right.service);
-      if (preferredDelta) return preferredDelta;
+      if (Number.isFinite(preferredDelta) && preferredDelta !== 0) return preferredDelta;
 
       const leftOrder = left.service.sortOrder ?? left.service.order;
       const rightOrder = right.service.sortOrder ?? right.service.order;
@@ -437,38 +437,114 @@ export async function getSedifexBlogPost(slug: string): Promise<SedifexBlogPost 
   return getLegacySedifexBlogPost(slug).catch(() => null);
 }
 
+function rawDateValue(record: SedifexRecord) {
+  return readString(record, [
+    "startDate",
+    "start_date",
+    "date",
+    "eventDate",
+    "event_date",
+    "availableDate",
+    "available_date",
+    "slotDate",
+    "slot_date",
+    "startsAt",
+    "starts_at",
+    "startAt",
+    "start_at",
+    "start",
+    "datetime",
+    "dateTime",
+    "scheduledAt",
+    "scheduled_at",
+  ]);
+}
+
+function rawEndDateValue(record: SedifexRecord) {
+  return readString(record, ["endDate", "end_date", "endsAt", "ends_at", "endAt", "end_at", "end", "finishAt", "finish_at"]);
+}
+
+function rawStartTimeValue(record: SedifexRecord, dateValue: string) {
+  return readString(record, ["startTime", "start_time", "time", "availableTime", "available_time", "slotTime", "slot_time", "hour"]) ||
+    extractTimeFromDateTime(dateValue);
+}
+
+function rawEndTimeValue(record: SedifexRecord, endDateValue: string) {
+  return readString(record, ["endTime", "end_time", "finishTime", "finish_time"]) || extractTimeFromDateTime(endDateValue);
+}
+
+function extractTimeFromDateTime(value: string) {
+  const match = value.match(/(?:T|\s)(\d{1,2}:\d{2})(?::\d{2})?/);
+  return match?.[1] || "";
+}
+
+function cleanDateValue(value: string) {
+  if (!value) return "";
+  const dateOnly = value.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (dateOnly) return dateOnly[1];
+
+  const parsed = new Date(value);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().slice(0, 10);
+  }
+
+  return value;
+}
+
+function cleanTimeValue(value: string) {
+  if (!value) return "";
+  const match = value.match(/(\d{1,2}:\d{2})/);
+  if (match) return match[1];
+  return value;
+}
+
+function normalizeEventTitle(title: string, serviceName: string, itemName: string, index: number) {
+  const selected = title || serviceName || itemName || `Event ${index + 1}`;
+  if (/^(?:available\s*)?(?:slot|availability|appointment|booking)$/i.test(selected.trim())) {
+    return serviceName || itemName || `Available Session ${index + 1}`;
+  }
+  return selected;
+}
+
 function normalizeEvent(raw: unknown, index: number): SedifexEvent {
   const record = isRecord(raw) ? raw : {};
   const service = isRecord(record.service) ? record.service : {};
   const item = isRecord(record.item) ? record.item : {};
-  const title = readString(record, ["title", "name", "heading", "label", "eventName", "event_name"]) || readString(service, ["title", "name", "serviceName", "service_name"]) || readString(item, ["title", "name", "serviceName", "service_name"], `Event ${index + 1}`);
+  const rawTitle = readString(record, ["title", "name", "heading", "label", "eventName", "event_name"]);
+  const serviceName = readString(record, ["serviceName", "service_name", "itemName", "item_name", "productName", "product_name"]) || readString(service, ["name", "serviceName", "service_name", "title"]);
+  const itemName = readString(item, ["name", "serviceName", "service_name", "title"]);
+  const title = normalizeEventTitle(rawTitle, serviceName, itemName, index);
   const serviceId = readString(record, ["serviceId", "service_id", "itemId", "item_id", "productId", "product_id"]) || readString(service, ["id", "serviceId", "service_id", "itemId", "item_id"]) || readString(item, ["id", "serviceId", "service_id", "itemId", "item_id"]);
-  const serviceName = readString(record, ["serviceName", "service_name", "itemName", "item_name", "productName", "product_name"]) || readString(service, ["name", "serviceName", "service_name", "title"]) || readString(item, ["name", "serviceName", "service_name", "title"]);
+  const startDateRaw = rawDateValue(record);
+  const endDateRaw = rawEndDateValue(record);
+  const startTimeRaw = rawStartTimeValue(record, startDateRaw);
+  const endTimeRaw = rawEndTimeValue(record, endDateRaw);
+  const type = readString(record, ["category", "type", "kind", "badge", "label"]);
 
   return {
-    id: readString(record, ["id", "_id", "uid", "eventId", "event_id", "availabilityId", "availability_id", "slotId", "slot_id", "slug", "documentId"], serviceId || slugify(title) || `event-${index + 1}`),
+    id: readString(record, ["id", "_id", "uid", "eventId", "event_id", "availabilityId", "availability_id", "slotId", "slot_id", "slug", "documentId"], serviceId || slugify(`${title}-${startDateRaw}-${startTimeRaw}`) || `event-${index + 1}`),
     slug: readString(record, ["slug", "eventSlug", "event_slug"]) || undefined,
     title,
-    category: readString(record, ["category", "type", "kind", "badge", "label"], "Upcoming Event") || undefined,
+    category: /^(slot|availability|available)$/i.test(type) ? "Available Session" : type || "Upcoming Event",
     description: readString(record, ["description", "excerpt", "summary", "subtitle", "notes", "details"]) || readString(service, ["description", "summary"]) || readString(item, ["description", "summary"]) || undefined,
     imageUrl: readString(record, ["imageUrl", "image_url", "coverImageUrl", "cover_image_url", "bannerImageUrl", "banner_image_url", "image", "thumbnailUrl", "thumbnail_url"]) || readString(service, ["imageUrl", "image_url", "image"]) || readString(item, ["imageUrl", "image_url", "image"]) || undefined,
-    startDate: readString(record, ["startDate", "start_date", "date", "eventDate", "event_date", "availableDate", "available_date", "slotDate", "slot_date", "startsAt", "starts_at", "startAt", "start_at"]) || undefined,
-    endDate: readString(record, ["endDate", "end_date", "endsAt", "ends_at", "endAt", "end_at"]) || undefined,
-    startTime: readString(record, ["startTime", "start_time", "time", "availableTime", "available_time", "slotTime", "slot_time"]) || undefined,
-    endTime: readString(record, ["endTime", "end_time"]) || undefined,
-    location: readString(record, ["location", "venue", "place", "timezone"], "Online / to be confirmed") || undefined,
+    startDate: cleanDateValue(startDateRaw) || undefined,
+    endDate: cleanDateValue(endDateRaw) || undefined,
+    startTime: cleanTimeValue(startTimeRaw) || undefined,
+    endTime: cleanTimeValue(endTimeRaw) || undefined,
+    location: readString(record, ["location", "venue", "place", "meetingLink", "meeting_link", "timezone"]) || readString(service, ["location", "venue"]) || "Online / to be confirmed",
     status: readString(record, ["status", "availabilityStatus", "availability_status", "publishStatus", "publish_status"]) || undefined,
     ctaLabel: readString(record, ["ctaLabel", "cta_label", "buttonText", "button_text"], "Register Interest") || undefined,
     ctaHref: readString(record, ["ctaHref", "cta_href", "buttonLink", "button_link", "url", "link", "href"]) || undefined,
     serviceId: serviceId || undefined,
-    serviceName: serviceName || title,
-    availableSlots: readNumber(record, ["availableSlots", "available_slots", "availableCount", "available_count", "capacity", "stockCount", "stock_count"]),
+    serviceName: serviceName || itemName || title,
+    availableSlots: readNumber(record, ["availableSlots", "available_slots", "availableCount", "available_count", "remainingSlots", "remaining_slots", "slotsRemaining", "slots_remaining", "capacity", "stockCount", "stock_count"]),
   };
 }
 
 function visibleEvent(event: SedifexEvent) {
   const status = (event.status || "").trim().toLowerCase();
-  return !status || /active|published|upcoming|public|open|available/.test(status);
+  return !status || /active|published|upcoming|public|open|available|scheduled|confirmed/.test(status);
 }
 
 function isEventPromo(raw: unknown, event: SedifexEvent) {
@@ -476,18 +552,14 @@ function isEventPromo(raw: unknown, event: SedifexEvent) {
   return /event|webinar|workshop|seminar|session|info session|availability|slot/.test(marker);
 }
 
+function eventTimestamp(event: SedifexEvent) {
+  const parsed = Date.parse(`${event.startDate || ""} ${event.startTime || ""}`.trim());
+  return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
+}
+
 function sortEvents(events: SedifexEvent[]) {
-  return dedupeByKey(events, (event) => event.slug || event.id || event.title).sort((left, right) => {
-    const leftTime = Date.parse(`${left.startDate || ""} ${left.startTime || ""}`.trim());
-    const rightTime = Date.parse(`${right.startDate || ""} ${right.startTime || ""}`.trim());
-
-    if (Number.isFinite(leftTime) || Number.isFinite(rightTime)) {
-      return (Number.isFinite(leftTime) ? leftTime : Number.POSITIVE_INFINITY) -
-        (Number.isFinite(rightTime) ? rightTime : Number.POSITIVE_INFINITY);
-    }
-
-    return 0;
-  });
+  return dedupeByKey(events, (event) => event.slug || event.id || `${event.title}-${event.startDate || ""}-${event.startTime || ""}`)
+    .sort((left, right) => eventTimestamp(left) - eventTimestamp(right));
 }
 
 function extractEvents(payload: unknown, kind: ContentKind) {
