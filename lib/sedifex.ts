@@ -1,4 +1,4 @@
-import { fallbackBlogPosts, fallbackServices } from "./site";
+import { fallbackBlogPosts, fallbackServices, site } from "./site";
 
 const SEDIFEX_BASE_URL =
   process.env.SEDIFEX_INTEGRATION_API_BASE_URL ||
@@ -19,7 +19,7 @@ const SEDIFEX_STORE_SLUG =
   process.env.SEDIFEX_STORE_SLUG ||
   process.env.SEDIFEX_PUBLIC_STORE_SLUG ||
   process.env.NEXT_PUBLIC_SEDIFEX_STORE_SLUG ||
-  "";
+  slugify(site.name);
 
 const SEDIFEX_API_KEY =
   process.env.SEDIFEX_INTEGRATION_API_KEY ||
