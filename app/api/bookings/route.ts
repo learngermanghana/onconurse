@@ -50,9 +50,9 @@ export async function POST(request: Request) {
       phone: getString(customerInput, "phone"),
     };
 
-    const serviceId = getString(body, "serviceId") || "pirus-consultation";
+    const serviceId = getString(body, "serviceId") || "onco-nurse-consultation";
     const serviceName =
-      getString(body, "serviceName") || "Pirus Consultancy Consultation";
+      getString(body, "serviceName") || "Onco-nurse Consultation";
 
     const country = getString(body, "country");
     const pathway = getString(body, "pathway");
@@ -106,6 +106,7 @@ export async function POST(request: Request) {
     }
 
     const requestUrl = new URL(request.url);
+    const successUrl = new URL("/payment/success", requestUrl.origin).toString();
 
     const result = await createSedifexBookingCheckout({
       serviceId,
@@ -127,13 +128,12 @@ export async function POST(request: Request) {
         .join("\n"),
       paymentAmount,
       sourceChannel: "client_website",
-      returnUrl: getSedifexCheckoutReturnUrl(
-        new URL("/payment/return", requestUrl.origin).toString()
-      ),
+      returnUrl: getSedifexCheckoutReturnUrl(successUrl),
       attributes: {
         source: "website_booking_form",
-        sourceLabel: "Pirus Consultancy website",
+        sourceLabel: "Onco-nurse website",
         pageUrl: getString(attributesInput, "pageUrl"),
+        successUrl,
         timezone: getString(attributesInput, "timezone") || "Africa/Accra",
         locale: getString(attributesInput, "locale") || "en-GB",
         country,
