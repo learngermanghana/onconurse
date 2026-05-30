@@ -46,7 +46,7 @@ function renderFormattedTextContent(value: string) {
     .map((paragraph) => paragraph.replace(/\s*\n\s*/g, " ").trim())
     .filter(Boolean)
     .map((paragraph, index) => {
-      const sectionMatch = paragraph.match(/^\*\*(.+?)\*\*\s*(.*)$/s);
+      const sectionMatch = paragraph.match(/^\*\*(.+?)\*\*\s*(.*)$/);
 
       if (sectionMatch) {
         const [, heading, body] = sectionMatch;
