@@ -1,19 +1,42 @@
 import { fallbackBlogPosts, fallbackServices, site } from "./site";
 
-const SEDIFEX_BASE_URL =
-  process.env.SEDIFEX_INTEGRATION_API_BASE_URL ||
-  process.env.SEDIFEX_API_BASE_URL ||
+const DEFAULT_SEDIFEX_API_BASE_URL =
   "https://us-central1-sedifex-web.cloudfunctions.net";
+
+function getSedifexConfig() {
+  const storeId =
+    process.env.SEDIFEX_STORE_ID ||
+    process.env.SEDIFEX_BOOKING_TARGET_STORE_ID ||
+    process.env.NEXT_PUBLIC_SEDIFEX_STORE_ID ||
+    "";
+
+  const apiKey =
+    process.env.SEDIFEX_INTEGRATION_API_KEY ||
+    process.env.SEDIFEX_PRODUCTS_API_KEY ||
+    process.env.SEDIFEX_BOOKING_API_KEY ||
+    process.env.SEDIFEX_INTEGRATION_KEY ||
+    "";
+
+  return {
+    baseUrl:
+      process.env.SEDIFEX_INTEGRATION_API_BASE_URL ||
+      process.env.SEDIFEX_API_BASE_URL ||
+      DEFAULT_SEDIFEX_API_BASE_URL,
+    storeId,
+    apiKey,
+    contractVersion: process.env.SEDIFEX_CONTRACT_VERSION || "2026-04-13",
+  };
+}
+
+const SEDIFEX_CONFIG = getSedifexConfig();
+const SEDIFEX_BASE_URL = SEDIFEX_CONFIG.baseUrl;
 
 const SEDIFEX_PUBLIC_API_BASE_URL =
   process.env.SEDIFEX_PUBLIC_API_BASE_URL ||
   process.env.NEXT_PUBLIC_SEDIFEX_PUBLIC_API_BASE_URL ||
   "https://sedifex.com";
 
-const SEDIFEX_STORE_ID =
-  process.env.SEDIFEX_STORE_ID ||
-  process.env.SEDIFEX_BOOKING_TARGET_STORE_ID ||
-  "";
+const SEDIFEX_STORE_ID = SEDIFEX_CONFIG.storeId;
 
 const SEDIFEX_STORE_SLUG =
   process.env.SEDIFEX_STORE_SLUG ||
@@ -21,14 +44,9 @@ const SEDIFEX_STORE_SLUG =
   process.env.NEXT_PUBLIC_SEDIFEX_STORE_SLUG ||
   slugify(site.name);
 
-const SEDIFEX_API_KEY =
-  process.env.SEDIFEX_INTEGRATION_API_KEY ||
-  process.env.SEDIFEX_PRODUCTS_API_KEY ||
-  process.env.SEDIFEX_BOOKING_API_KEY ||
-  "";
+const SEDIFEX_API_KEY = SEDIFEX_CONFIG.apiKey;
 
-const SEDIFEX_CONTRACT_VERSION =
-  process.env.SEDIFEX_CONTRACT_VERSION || "2026-04-13";
+const SEDIFEX_CONTRACT_VERSION = SEDIFEX_CONFIG.contractVersion;
 
 export type SedifexService = {
   id: string;
@@ -47,6 +65,8 @@ export type SedifexService = {
   imageAlt?: string;
   updatedAt?: string;
   tag?: string;
+  sortOrder?: number;
+  order?: number;
 };
 
 export type SedifexBlogPost = {
@@ -264,48 +284,203 @@ async function sedifexPost<T>(path: string, body: unknown): Promise<T> {
   return response.json();
 }
 
-function serviceItemsFromPayload(payload: unknown): SedifexService[] {
+type SedifexProductsResponse = {
+  products?: unknown[];
+  publicProducts?: unknown[];
+  publicServices?: unknown[];
+};
+
+type SedifexPublicCatalogResponse = {
+  items?: unknown[];
+};
+
+const preferredServiceNames = [
+  "nursing ausbildung",
+  "fsj",
+  "bfd",
+  "au-pair",
+  "au pair",
+  "recognition",
+  "student visa",
+  "document review",
+];
+
+function serviceItemsFromPayload(payload: unknown, publicCatalog = false): unknown[] {
   if (!isRecord(payload)) return [];
 
-  const candidates = [
-    payload.products,
-    payload.publicServices,
-    payload.services,
-    payload.items,
-    payload.data,
-  ];
+  if (publicCatalog) {
+    return Array.isArray((payload as SedifexPublicCatalogResponse).items)
+      ? (payload as SedifexPublicCatalogResponse).items || []
+      : [];
+  }
 
-  const items = candidates.find((value) => Array.isArray(value));
-  if (!Array.isArray(items)) return [];
+  const response = payload as SedifexProductsResponse;
 
-  return (items as SedifexService[]).filter((item) => {
-    const itemType = (item.itemType || "").toLowerCase();
-    const type = (item.type || "").toUpperCase();
-    return itemType === "service" || type === "SERVICE";
-  });
+  if (Array.isArray(response.publicServices) && response.publicServices.length) {
+    return response.publicServices;
+  }
+
+  if (Array.isArray(response.products) && response.products.length) {
+    return response.products;
+  }
+
+  if (Array.isArray(response.publicProducts) && response.publicProducts.length) {
+    return response.publicProducts;
+  }
+
+  return [];
+}
+
+function isServiceItem(item: unknown) {
+  if (!isRecord(item)) return false;
+
+  const itemType = readString(item, ["itemType", "type"]).toLowerCase();
+  return itemType === "service";
+}
+
+function readNumber(record: SedifexRecord, keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = record[key];
+
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+      const parsed = Number(value.replace(/[^0-9.-]+/g, ""));
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+
+  return undefined;
+}
+
+function readStringArray(record: SedifexRecord, keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+
+    if (Array.isArray(value)) {
+      return value.filter(
+        (item): item is string => typeof item === "string" && Boolean(item.trim())
+      );
+    }
+  }
+
+  return [];
+}
+
+function normalizeServiceDescription(description: string) {
+  return description
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\*\*/g, "").trim())
+    .filter((line) => {
+      if (!line) return false;
+      if (/^(?:product\s*name|item\s*type|category)\s*:/i.test(line)) return false;
+      if (/^not provided$/i.test(line)) return false;
+      return true;
+    })
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .replace(/\s+([.,;:!?])/g, "$1")
+    .trim();
+}
+
+function normalizeCategory(category: string) {
+  return /^not provided$/i.test(category.trim()) ? "" : category.trim();
+}
+
+function mapSedifexItem(raw: unknown, index: number): SedifexService {
+  const record = isRecord(raw) ? raw : {};
+  const name = readString(record, ["name", "serviceName", "title"], `Service ${index + 1}`);
+  const imageUrls = readStringArray(record, ["imageUrls", "images"]);
+  const description = normalizeServiceDescription(
+    readString(record, ["description", "shortDescription", "summary", "details"])
+  );
+  const price = readNumber(record, ["price", "amount", "unitPrice"]);
+  const priceMinor = readNumber(record, ["priceMinor", "amountMinor"]);
+
+  return {
+    id: readString(record, ["id", "productId", "itemId", "serviceId"], `service-${index + 1}`),
+    slug: readString(record, ["slug"]) || undefined,
+    storeId: readString(record, ["storeId"]) || undefined,
+    name,
+    category: normalizeCategory(readString(record, ["category", "categoryName"])),
+    description,
+    price,
+    priceMinor,
+    stockCount: readNumber(record, ["stockCount", "stock"]) ?? null,
+    itemType: readString(record, ["itemType"]) || undefined,
+    type: readString(record, ["type"]) || undefined,
+    imageUrl: readString(record, ["imageUrl", "image", "thumbnailUrl"]) || imageUrls[0],
+    imageUrls,
+    imageAlt: readString(record, ["imageAlt", "alt"], name),
+    updatedAt: readString(record, ["updatedAt"]) || undefined,
+    tag: readString(record, ["tag", "badge", "label"]) || undefined,
+    sortOrder: readNumber(record, ["sortOrder", "order", "position"]),
+    order: readNumber(record, ["order"]),
+  };
+}
+
+function preferredServiceIndex(service: SedifexService) {
+  const searchable = `${service.name} ${service.category || ""}`.toLowerCase();
+  const index = preferredServiceNames.findIndex((name) => searchable.includes(name));
+  return index === -1 ? Number.POSITIVE_INFINITY : index;
+}
+
+function sortSedifexServices(services: SedifexService[]) {
+  return services
+    .map((service, index) => ({ service, index }))
+    .sort((left, right) => {
+      const preferredDelta =
+        preferredServiceIndex(left.service) - preferredServiceIndex(right.service);
+      if (preferredDelta) return preferredDelta;
+
+      const leftOrder = left.service.sortOrder ?? left.service.order;
+      const rightOrder = right.service.sortOrder ?? right.service.order;
+
+      if (leftOrder !== undefined || rightOrder !== undefined) {
+        return (leftOrder ?? Number.POSITIVE_INFINITY) -
+          (rightOrder ?? Number.POSITIVE_INFINITY);
+      }
+
+      return left.index - right.index;
+    })
+    .map(({ service }) => service);
+}
+
+function fallbackServiceData() {
+  return sortSedifexServices(fallbackServices.map(mapSedifexItem));
 }
 
 export async function getSedifexServices(): Promise<SedifexService[]> {
-  const integrationPayload = await sedifexGet<unknown>(
-    "/v1IntegrationProducts",
-    {},
-    30
-  );
-  const integrationServices = serviceItemsFromPayload(integrationPayload);
+  try {
+    const integrationPayload = await sedifexGet<unknown>(
+      "/v1IntegrationProducts",
+      {},
+      30
+    );
+    const integrationServices = serviceItemsFromPayload(integrationPayload)
+      .filter(isServiceItem)
+      .map(mapSedifexItem);
 
-  if (integrationServices.length) return integrationServices;
+    if (integrationServices.length) return sortSedifexServices(integrationServices);
 
-  const publicPayload = await sedifexGet<unknown>(
-    "/publicQuickPayCatalog",
-    {},
-    30,
-    true,
-    false
-  );
-  const publicServices = serviceItemsFromPayload(publicPayload);
+    const publicPayload = await sedifexGet<unknown>(
+      "/publicQuickPayCatalog",
+      {},
+      30,
+      true,
+      false
+    );
+    const publicServices = serviceItemsFromPayload(publicPayload, true)
+      .filter(isServiceItem)
+      .map(mapSedifexItem);
 
-  return publicServices.length ? publicServices : fallbackServices;
+    return publicServices.length ? sortSedifexServices(publicServices) : fallbackServiceData();
+  } catch (error) {
+    console.error("Sedifex service load failed", { error });
+    return fallbackServiceData();
+  }
 }
+
+export const getServiceData = getSedifexServices;
 
 export async function getSedifexHeroSlides(): Promise<SedifexHeroSlide[]> {
   const payload = await sedifexGet<{ slides?: SedifexHeroSlide[] }>(
