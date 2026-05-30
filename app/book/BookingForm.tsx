@@ -27,11 +27,15 @@ export default function BookingForm({
   );
   const [status, setStatus] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const fallbackInitialService = serviceOptions[0];
   const [selectedServiceId, setSelectedServiceId] = useState(
-    initialService?.id || initialServiceId || "onco-nurse-consultation"
+    initialService?.id ||
+      fallbackInitialService?.id ||
+      initialServiceId ||
+      "onco-nurse-consultation"
   );
   const [serviceName, setServiceName] = useState(
-    initialService?.name || initialServiceName
+    initialService?.name || fallbackInitialService?.name || initialServiceName
   );
 
   const selectedService = serviceOptions.find(
@@ -50,7 +54,7 @@ export default function BookingForm({
 
     const form = new FormData(event.currentTarget);
 
-    setStatus("Sending...");
+    setStatus("Creating your booking before secure checkout...");
     setIsSubmitting(true);
 
     try {
@@ -88,16 +92,24 @@ export default function BookingForm({
       }));
 
       if (response.ok) {
+        if (result.checkoutUrl || result.authorizationUrl) {
+          setStatus("Booking saved. Redirecting to secure Sedifex checkout...");
+          window.location.assign(result.checkoutUrl || result.authorizationUrl);
+          return;
+        }
+
         setStatus(
           result.demoMode
-            ? "Demo booking received. Add Sedifex keys to send bookings into Sedifex."
+            ? "Demo booking received. Add Sedifex booking and checkout keys to redirect to payment."
             : `Booking received successfully${
                 result.reference ? ` (${result.reference})` : ""
-              }.`
+              }. Sedifex checkout did not return a payment link.`
         );
         event.currentTarget.reset();
-        setSelectedServiceId("onco-nurse-consultation");
-        setServiceName("");
+        setSelectedServiceId(
+          fallbackInitialService?.id || "onco-nurse-consultation"
+        );
+        setServiceName(fallbackInitialService?.name || "");
       } else {
         setStatus(result.error || "Could not submit booking.");
       }
@@ -118,14 +130,14 @@ export default function BookingForm({
         </h1>
 
         <p className="section-subtitle">
-          Choose a Sedifex service, request a date and time, and Onco-nurse will
-          follow up. Bookings are submitted to the Sedifex Booking API when your
-          integration key is configured.
+          Choose a Sedifex service, request a date and time, then pay through
+          secure Sedifex checkout. The booking is created first so payment and
+          confirmation stay tied to the same Sedifex record.
         </p>
 
         <div className="mt-8 rounded-3xl border border-emerald-100 bg-white p-6 shadow-sm">
           <p className="text-sm font-black uppercase tracking-[0.16em] text-emerald-700">
-            How Sedifex data loads
+            How Sedifex booking + payment works
           </p>
           <ol className="mt-4 space-y-4 text-sm leading-6 text-slate-600">
             <li>
@@ -143,9 +155,9 @@ export default function BookingForm({
               /publicQuickPayCatalog?storeId=... and keeps only service records.
             </li>
             <li>
-              <span className="font-black text-slate-950">4. Form options:</span>{" "}
-              Records are normalized into id, name, category and price values,
-              then rendered as the dropdown below.
+              <span className="font-black text-slate-950">4. Checkout:</span>{" "}
+              After the booking record is created, Sedifex checkout opens with
+              the same store id, service id and booking reference.
             </li>
           </ol>
         </div>
@@ -176,7 +188,10 @@ export default function BookingForm({
               onChange={(e) => updateSelectedService(e.target.value)}
               required
             >
-              <option value="onco-nurse-consultation">
+              <option
+                value="onco-nurse-consultation"
+                disabled={serviceOptions.length > 0}
+              >
                 General Onco-nurse consultation
               </option>
               {serviceOptions.map((service) => (
@@ -290,12 +305,19 @@ export default function BookingForm({
           </div>
         </div>
 
+        {selectedService?.priceLabel && (
+          <p className="mt-5 rounded-2xl bg-emerald-50 p-4 text-sm font-bold text-emerald-900">
+            Checkout total: {selectedService.priceLabel}. Payment is verified by
+            Sedifex after checkout; the return page will not mark payment paid.
+          </p>
+        )}
+
         <button
           type="submit"
           disabled={isSubmitting}
           className="mt-6 w-full rounded-full bg-emerald-700 px-6 py-4 font-black text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-400"
         >
-          {isSubmitting ? "Sending..." : "Submit Booking"}
+          {isSubmitting ? "Creating checkout..." : "Book & Pay with Sedifex"}
         </button>
 
         {status && (
