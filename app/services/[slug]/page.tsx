@@ -4,7 +4,7 @@ import {
   formatPrice,
   getSedifexService,
   whatsappLink,
-} from "../../../lib/sedifex";
+} from "../../../lib/sedifex-public";
 import { site } from "../../../lib/site";
 
 export default async function SingleServicePage({
