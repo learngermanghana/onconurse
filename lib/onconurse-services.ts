@@ -1,7 +1,3 @@
-import {
-  getSedifexService,
-  getSedifexServices,
-} from "./sedifex-public";
 import { slugify, type SedifexService } from "./sedifex";
 
 const DEFAULT_SEDIFEX_API_BASE_URL =
@@ -12,46 +8,32 @@ const SEDIFEX_BASE_URL =
   process.env.SEDIFEX_API_BASE_URL ||
   DEFAULT_SEDIFEX_API_BASE_URL;
 
-const SEDIFEX_PUBLIC_API_BASE_URL =
-  process.env.SEDIFEX_PUBLIC_API_BASE_URL ||
-  process.env.NEXT_PUBLIC_SEDIFEX_PUBLIC_API_BASE_URL ||
-  "https://sedifex.com";
-
 const SEDIFEX_STORE_ID =
   process.env.SEDIFEX_BOOKING_TARGET_STORE_ID ||
   process.env.SEDIFEX_STORE_ID ||
   process.env.NEXT_PUBLIC_SEDIFEX_STORE_ID ||
   "";
 
-const SEDIFEX_STORE_SLUG =
-  process.env.SEDIFEX_STORE_SLUG ||
-  process.env.SEDIFEX_PUBLIC_STORE_SLUG ||
-  process.env.NEXT_PUBLIC_SEDIFEX_STORE_SLUG ||
-  "onco-nurse";
-
 const SEDIFEX_API_KEY =
-  process.env.SEDIFEX_BOOKING_API_KEY ||
-  process.env.SEDIFEX_CHECKOUT_API_KEY ||
   process.env.SEDIFEX_INTEGRATION_API_KEY ||
-  process.env.SEDIFEX_INTEGRATION_KEY ||
   process.env.SEDIFEX_PRODUCTS_API_KEY ||
+  process.env.SEDIFEX_INTEGRATION_KEY ||
+  process.env.SEDIFEX_BOOKING_API_KEY ||
   "";
 
 const SEDIFEX_CONTRACT_VERSION =
   process.env.SEDIFEX_CONTRACT_VERSION || "2026-04-13";
 
-const DEFAULT_ROOT_PRODUCT_IDS = ["1EKXNNXLsBOV4lOUKvMv"];
-
 type JsonRecord = Record<string, unknown>;
 
-type ProductAttempt = {
-  baseUrl: string;
-  path: string;
-  params: Record<string, string>;
-  authenticated?: boolean;
+type ProductsResponse = {
+  ok?: boolean;
+  storeId?: string;
+  count?: number;
+  products?: unknown[];
 };
 
-function usable(value?: string) {
+function hasUsableValue(value?: string) {
   return Boolean(value && !value.includes("PASTE_") && !value.includes("YOUR_"));
 }
 
@@ -95,195 +77,42 @@ function readStringArray(record: JsonRecord, keys: string[]) {
   return [];
 }
 
-function serviceIdsFromEnv() {
-  const configured = process.env.SEDIFEX_SERVICE_PRODUCT_IDS || "";
-  const ids = configured
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-
-  return ids.length ? ids : DEFAULT_ROOT_PRODUCT_IDS;
+function isServiceProduct(item: unknown) {
+  if (!isRecord(item)) return false;
+  return readString(item, ["itemType"]).toLowerCase() === "service";
 }
 
-async function fetchJson(attempt: ProductAttempt) {
-  if (attempt.authenticated && !usable(SEDIFEX_API_KEY)) return null;
-
-  try {
-    const url = new URL(attempt.path, attempt.baseUrl);
-    Object.entries(attempt.params).forEach(([key, value]) => {
-      if (usable(value)) url.searchParams.set(key, value);
-    });
-
-    const response = await fetch(url, {
-      headers: attempt.authenticated
-        ? {
-            "x-api-key": SEDIFEX_API_KEY,
-            Authorization: `Bearer ${SEDIFEX_API_KEY}`,
-            "X-Sedifex-Contract-Version": SEDIFEX_CONTRACT_VERSION,
-            Accept: "application/json",
-          }
-        : { Accept: "application/json" },
-      next: { revalidate: 30 },
-    });
-
-    if (!response.ok) return null;
-    return response.json();
-  } catch {
-    return null;
-  }
-}
-
-function firstPayloadItem(payload: unknown): unknown | null {
-  if (Array.isArray(payload)) return payload[0] || null;
-  if (!isRecord(payload)) return null;
-
-  const direct =
-    payload.item ||
-    payload.service ||
-    payload.product ||
-    payload.publicProduct ||
-    payload.publicService ||
-    payload.listing ||
-    payload.data ||
-    payload.content;
-
-  if (direct && !Array.isArray(direct)) return direct;
-  if (readString(payload, ["name", "title"])) return payload;
-
-  for (const key of ["items", "products", "services", "publicProducts", "publicServices", "listings"]) {
-    const value = payload[key];
-    if (Array.isArray(value) && value[0]) return value[0];
-  }
-
-  return null;
-}
-
-function normalizeService(raw: unknown, index: number): SedifexService | null {
+function mapServiceProduct(raw: unknown, index: number): SedifexService | null {
   if (!isRecord(raw)) return null;
 
-  const name = readString(raw, ["name", "serviceName", "title"]);
-  if (!name) return null;
-
-  const imageUrls = readStringArray(raw, ["imageUrls", "image_urls", "images"]);
-  const id = readString(
-    raw,
-    [
-      "sourceProductId",
-      "publicListingId",
-      "productId",
-      "itemId",
-      "serviceId",
-      "id",
-      "documentId",
-    ],
-    slugify(name) || `service-${index + 1}`
-  );
+  const imageUrls = readStringArray(raw, ["imageUrls"]);
+  const name = readString(raw, ["name"], `Service ${index + 1}`);
+  const id = readString(raw, ["id"], slugify(name) || `service-${index + 1}`);
 
   return {
     id,
-    slug: readString(raw, ["slug", "productSlug", "serviceSlug"]) || slugify(name),
-    storeId: readString(raw, ["storeId"]) || SEDIFEX_STORE_ID || undefined,
+    slug: readString(raw, ["slug"]) || slugify(name),
+    storeId: readString(raw, ["storeId"]) || undefined,
     name,
-    category: readString(raw, ["categoryName", "category", "categoryKey"]),
-    description: readString(raw, ["description", "shortDescription", "summary", "details"]),
-    price: readNumber(raw, ["price", "amount", "unitPrice", "servicePrice"]),
-    priceMinor: readNumber(raw, ["priceMinor", "amountMinor"]),
-    stockCount: readNumber(raw, ["stockCount", "stock", "quantity"]) ?? null,
-    itemType: readString(raw, ["itemType", "listingType"]) || "service",
-    type: readString(raw, ["type", "listingType", "serviceKind"]) || "service",
-    imageUrl:
-      readString(raw, ["imageUrl", "image", "thumbnailUrl", "coverImageUrl"]) ||
-      imageUrls[0],
+    category: readString(raw, ["category", "categoryName"]),
+    description: readString(raw, ["description"]),
+    price: readNumber(raw, ["price"]),
+    priceMinor: readNumber(raw, ["priceMinor"]),
+    stockCount: readNumber(raw, ["stockCount"]) ?? null,
+    itemType: readString(raw, ["itemType"]) || "service",
+    type: readString(raw, ["type"]) || "SERVICE",
+    imageUrl: readString(raw, ["imageUrl"]) || imageUrls[0],
     imageUrls,
-    imageAlt: readString(raw, ["imageAlt", "alt"], name),
-    updatedAt: readString(raw, ["updatedAt", "publishedAt", "createdAt"]) || undefined,
-    tag: readString(raw, ["tag", "badge", "label", "serviceKind"]) || undefined,
-    sortOrder: readNumber(raw, ["sortOrder", "order", "position", "featuredRank"]),
+    imageAlt: readString(raw, ["imageAlt"], name),
+    updatedAt: readString(raw, ["updatedAt"]) || undefined,
+    tag: readString(raw, ["tag", "badge", "label"]) || undefined,
+    sortOrder: readNumber(raw, ["sortOrder", "order", "position"]),
     order: readNumber(raw, ["order"]),
   };
 }
 
-function productLookupParams(productId: string) {
-  return [
-    { itemId: productId },
-    { productId },
-    { publicListingId: productId },
-    { sourceProductId: productId },
-    { listingId: productId },
-    { id: productId },
-  ];
-}
-
-function knownProductAttempts(productId: string): ProductAttempt[] {
-  const attempts: ProductAttempt[] = [];
-  const functionPaths = [
-    "/v1IntegrationItem",
-    "/v1IntegrationItems",
-    "/v1IntegrationProduct",
-    "/v1IntegrationProducts",
-  ];
-  const publicFunctionPaths = ["/publicQuickPayItem", "/publicQuickPayCatalog"];
-
-  for (const path of functionPaths) {
-    for (const params of productLookupParams(productId)) {
-      attempts.push({
-        baseUrl: SEDIFEX_BASE_URL,
-        path,
-        params: { storeId: SEDIFEX_STORE_ID, ...params },
-        authenticated: true,
-      });
-    }
-  }
-
-  for (const path of publicFunctionPaths) {
-    for (const params of productLookupParams(productId)) {
-      attempts.push({
-        baseUrl: SEDIFEX_BASE_URL,
-        path,
-        params: { storeId: SEDIFEX_STORE_ID, ...params },
-      });
-    }
-  }
-
-  for (const path of [
-    `/api/public/products/${encodeURIComponent(productId)}`,
-    `/api/public/services/${encodeURIComponent(productId)}`,
-    `/api/public/catalog/${encodeURIComponent(productId)}`,
-  ]) {
-    attempts.push({
-      baseUrl: SEDIFEX_PUBLIC_API_BASE_URL,
-      path,
-      params: { storeId: SEDIFEX_STORE_ID, storeSlug: SEDIFEX_STORE_SLUG },
-    });
-  }
-
-  for (const path of ["/api/public/products", "/api/public/services", "/api/public/catalog"]) {
-    for (const params of productLookupParams(productId)) {
-      attempts.push({
-        baseUrl: SEDIFEX_PUBLIC_API_BASE_URL,
-        path,
-        params: { storeId: SEDIFEX_STORE_ID, storeSlug: SEDIFEX_STORE_SLUG, ...params },
-      });
-    }
-  }
-
-  return attempts;
-}
-
-async function getKnownProductServices() {
-  const services: SedifexService[] = [];
-
-  for (const productId of serviceIdsFromEnv()) {
-    for (const attempt of knownProductAttempts(productId)) {
-      const service = normalizeService(firstPayloadItem(await fetchJson(attempt)), services.length);
-      if (service) {
-        services.push(service);
-        break;
-      }
-    }
-  }
-
-  return services.sort((left, right) => {
+function sortServices(services: SedifexService[]) {
+  return [...services].sort((left, right) => {
     const leftOrder = left.sortOrder ?? left.order;
     const rightOrder = right.sortOrder ?? right.order;
 
@@ -296,24 +125,58 @@ async function getKnownProductServices() {
   });
 }
 
-export async function getOncoNurseServices() {
-  const knownProducts = await getKnownProductServices();
-  if (knownProducts.length) return knownProducts;
+export async function getOncoNurseServices(): Promise<SedifexService[]> {
+  if (!hasUsableValue(SEDIFEX_STORE_ID) || !hasUsableValue(SEDIFEX_API_KEY)) {
+    return [];
+  }
 
-  const services = await getSedifexServices();
-  return services.filter((service) => !service.id.startsWith("local-"));
+  const url = new URL("/v1IntegrationProducts", SEDIFEX_BASE_URL);
+  url.searchParams.set("storeId", SEDIFEX_STORE_ID);
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "x-api-key": SEDIFEX_API_KEY,
+        Authorization: `Bearer ${SEDIFEX_API_KEY}`,
+        "X-Sedifex-Contract-Version": SEDIFEX_CONTRACT_VERSION,
+        Accept: "application/json",
+      },
+      next: { revalidate: 30 },
+    });
+
+    if (!response.ok) {
+      console.error("Sedifex service products failed", {
+        status: response.status,
+        requestId: response.headers.get("x-sedifex-request-id"),
+      });
+      return [];
+    }
+
+    const payload = (await response.json()) as ProductsResponse;
+    const products = Array.isArray(payload.products) ? payload.products : [];
+
+    return sortServices(
+      products
+        .filter(isServiceProduct)
+        .map(mapServiceProduct)
+        .filter((service): service is SedifexService => Boolean(service))
+    );
+  } catch (error) {
+    console.error("Sedifex service products failed", { error });
+    return [];
+  }
 }
 
 export async function getOncoNurseService(slug: string) {
   const services = await getOncoNurseServices();
-  const match = services.find(
-    (service) =>
-      service.slug === slug ||
-      service.id === slug ||
-      slugify(service.name) === slug ||
-      encodeURIComponent(service.id) === slug
-  );
 
-  if (match) return match;
-  return getSedifexService(slug);
+  return (
+    services.find(
+      (service) =>
+        service.slug === slug ||
+        service.id === slug ||
+        slugify(service.name) === slug ||
+        encodeURIComponent(service.id) === slug
+    ) || null
+  );
 }
