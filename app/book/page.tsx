@@ -1,4 +1,5 @@
 import { formatPrice } from "../../lib/sedifex-public";
+import { getOncoNurseEvents } from "../../lib/onconurse-events";
 import { getOncoNurseServices } from "../../lib/onconurse-services";
 import BookingForm from "./BookingForm";
 
@@ -20,10 +21,15 @@ function parseAmount(value?: string) {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+function optionKey(option: { id: string; slotId?: string }) {
+  return `${option.id}-${option.slotId || "service"}`.toLowerCase();
+}
+
 export default async function BookPage({ searchParams }: BookPageProps) {
-  const [params, services] = await Promise.all([
+  const [params, services, events] = await Promise.all([
     searchParams,
     getOncoNurseServices(),
+    getOncoNurseEvents(),
   ]);
 
   const serviceOptions = services.map((service) => ({
@@ -34,12 +40,29 @@ export default async function BookPage({ searchParams }: BookPageProps) {
     category: service.category,
   }));
 
+  const eventOptions = events.map((event) => {
+    const amount = event.paymentAmount || event.price;
+
+    return {
+      id: event.serviceId || `manual:${event.id}`,
+      name: event.serviceName || event.title,
+      priceLabel: amount && amount > 0 ? formatPrice(amount) : undefined,
+      price: amount,
+      category: event.category || "Upcoming Event",
+      slotId: event.slotId || event.id,
+      bookingDate: event.startDate || event.displayDateText || "Date to be announced",
+      bookingTime: event.startTime || event.displayTimeText || "Time to be announced",
+      scheduleStatus: event.scheduleStatus,
+      isEvent: true,
+    };
+  });
+
   const eventAmount = parseAmount(params.paymentAmount);
-  const eventOption = params.serviceId
+  const selectedEventOption = params.serviceId
     ? {
         id: params.serviceId,
         name: params.serviceName || "Upcoming event",
-        priceLabel: eventAmount && eventAmount > 0 ? formatPrice(eventAmount) : "Register interest",
+        priceLabel: eventAmount && eventAmount > 0 ? formatPrice(eventAmount) : undefined,
         price: eventAmount,
         category: "Upcoming Event",
         slotId: params.slotId,
@@ -50,9 +73,17 @@ export default async function BookPage({ searchParams }: BookPageProps) {
       }
     : null;
 
-  const mergedOptions = eventOption
-    ? [eventOption, ...serviceOptions.filter((service) => service.id !== eventOption.id)]
-    : serviceOptions;
+  const seen = new Set<string>();
+  const mergedOptions = [
+    ...(selectedEventOption ? [selectedEventOption] : []),
+    ...eventOptions,
+    ...serviceOptions,
+  ].filter((option) => {
+    const key = optionKey(option);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 
   return (
     <BookingForm
