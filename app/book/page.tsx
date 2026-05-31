@@ -75,9 +75,9 @@ export default async function BookPage({ searchParams }: BookPageProps) {
 
   const seen = new Set<string>();
   const mergedOptions = [
+    ...serviceOptions,
     ...(selectedEventOption ? [selectedEventOption] : []),
     ...eventOptions,
-    ...serviceOptions,
   ].filter((option) => {
     const key = optionKey(option);
     if (seen.has(key)) return false;

@@ -65,6 +65,10 @@ function showTime(value: string) {
   return timeOptions.find(([time]) => time === clean)?.[1] || value || "Time to be announced";
 }
 
+function bookingOptionKey(option: { id: string; slotId?: string }) {
+  return `${option.id}-${option.slotId || "service"}`.toLowerCase();
+}
+
 export default function BookingForm({
   initialServiceId = "",
   initialServiceName = "",
@@ -75,12 +79,24 @@ export default function BookingForm({
   serviceOptions = [],
 }: BookingFormProps) {
   const initialService = useMemo(
-    () => serviceOptions.find((service) => service.id === initialServiceId),
-    [initialServiceId, serviceOptions]
+    () =>
+      serviceOptions.find(
+        (service) =>
+          service.id === initialServiceId &&
+          (!initialSlotId || service.slotId === initialSlotId)
+      ) || serviceOptions.find((service) => service.id === initialServiceId),
+    [initialServiceId, initialSlotId, serviceOptions]
   );
-  const fallbackInitialService = serviceOptions[0];
+  const fallbackInitialService =
+    serviceOptions.find((service) => !service.isEvent) || serviceOptions[0];
+  const fallbackOptionKey = fallbackInitialService
+    ? bookingOptionKey(fallbackInitialService)
+    : "onco-nurse-consultation";
   const [status, setStatus] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedOptionKey, setSelectedOptionKey] = useState(
+    initialService ? bookingOptionKey(initialService) : fallbackOptionKey
+  );
   const [selectedServiceId, setSelectedServiceId] = useState(
     initialService?.id || fallbackInitialService?.id || initialServiceId || "onco-nurse-consultation"
   );
@@ -92,15 +108,20 @@ export default function BookingForm({
   const [bookingTime, setBookingTime] = useState(timeInputValue(initialService?.bookingTime || initialBookingTime || "") || initialService?.bookingTime || initialBookingTime || "");
   const [scheduleStatus, setScheduleStatus] = useState(initialService?.scheduleStatus || initialScheduleStatus || "");
 
-  const selectedService = serviceOptions.find((service) => service.id === selectedServiceId);
+  const selectedService = serviceOptions.find(
+    (service) => bookingOptionKey(service) === selectedOptionKey
+  );
   const isSelectedEvent = Boolean(slotId || selectedService?.isEvent);
   const selectedPrice = selectedService?.price || 0;
 
-  function updateSelectedService(serviceId: string) {
-    setSelectedServiceId(serviceId);
-    const nextService = serviceOptions.find((service) => service.id === serviceId);
+  function updateSelectedService(optionKey: string) {
+    setSelectedOptionKey(optionKey);
+    const nextService = serviceOptions.find(
+      (service) => bookingOptionKey(service) === optionKey
+    );
     if (!nextService) return;
 
+    setSelectedServiceId(nextService.id);
     setServiceName(nextService.name);
     setSlotId(nextService.slotId || "");
     setBookingDate(nextService.bookingDate || "");
@@ -194,16 +215,25 @@ export default function BookingForm({
 
       <form onSubmit={submitBooking} className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-xl md:p-8">
         <input type="hidden" name="slotId" value={slotId} />
+        <input type="hidden" name="serviceId" value={selectedServiceId} />
         <input type="hidden" name="scheduleStatus" value={scheduleStatus} />
         <input type="hidden" name="serviceName" value={serviceName} />
 
         <div className="grid gap-5 md:grid-cols-2">
           <div className="md:col-span-2">
             <label className="label">Service or upcoming event</label>
-            <select name="serviceId" className="input mt-2" value={selectedServiceId} onChange={(e) => updateSelectedService(e.target.value)} required>
-              <option value="onco-nurse-consultation" disabled={serviceOptions.length > 0}>General Onco-nurse consultation</option>
+            <select
+              name="bookingOption"
+              className="input mt-2"
+              value={selectedOptionKey}
+              onChange={(e) => updateSelectedService(e.target.value)}
+              required
+            >
+              <option value="onco-nurse-consultation" disabled={serviceOptions.length > 0}>
+                General Onco-nurse consultation
+              </option>
               {serviceOptions.map((service) => (
-                <option key={`${service.id}-${service.slotId || "service"}`} value={service.id}>
+                <option key={bookingOptionKey(service)} value={bookingOptionKey(service)}>
                   {service.name}{service.priceLabel ? ` — ${service.priceLabel}` : ""}
                 </option>
               ))}
