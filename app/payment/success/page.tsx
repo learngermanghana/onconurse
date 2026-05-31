@@ -3,16 +3,16 @@ import Link from "next/link";
 export default function PaymentSuccessPage() {
   return (
     <main className="section mx-auto max-w-4xl text-center">
-      <span className="badge">Booking submitted</span>
+      <span className="badge">Booking received</span>
 
       <h1 className="section-title mt-4">
-        Thank you. Your Germany pathway booking is being processed.
+        Thank you. Your Germany pathway booking has been received.
       </h1>
 
       <p className="section-subtitle mx-auto mt-4">
-        Your Sedifex checkout return has been received. Sedifex will verify the
-        payment and keep it connected to the same booking record before final
-        confirmation.
+        Your booking and payment details have been received successfully. A
+        confirmation has been sent to your email if you provided one. Our team
+        will review your booking and follow up with you soon.
       </p>
 
       <div className="mt-10 grid gap-5 text-left md:grid-cols-3">
@@ -21,11 +21,11 @@ export default function PaymentSuccessPage() {
             Step 1
           </p>
           <h2 className="mt-3 text-xl font-black text-slate-950">
-            Payment verification
+            Booking received
           </h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Sedifex confirms the payment by webhook or order verification before
-            the booking is marked as paid.
+            Your selected service or event, contact details, date and time have
+            been submitted to Onco-nurse.
           </p>
         </div>
 
@@ -34,11 +34,11 @@ export default function PaymentSuccessPage() {
             Step 2
           </p>
           <h2 className="mt-3 text-xl font-black text-slate-950">
-            Booking confirmation
+            Email confirmation
           </h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Onco-nurse reviews the selected service, preferred date and preferred
-            time connected to your Sedifex booking.
+            A booking confirmation is sent to your email when an email address is
+            provided. Please also check your spam or promotions folder.
           </p>
         </div>
 
@@ -47,20 +47,23 @@ export default function PaymentSuccessPage() {
             Step 3
           </p>
           <h2 className="mt-3 text-xl font-black text-slate-950">
-            Team follow-up
+            Prepare for follow-up
           </h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Our team will contact you through the phone, WhatsApp or email you
-            submitted in the booking form.
+            Our team will contact you through phone, WhatsApp or email. Please
+            prepare your questions and any relevant documents for the discussion.
           </p>
         </div>
       </div>
 
       <div className="mt-10 rounded-[2rem] bg-slate-950 p-8 text-left text-white">
-        <h2 className="text-2xl font-black">Please do not book again</h2>
+        <h2 className="text-2xl font-black">Please do not submit again</h2>
         <p className="mt-3 leading-7 text-slate-300">
-          If money has been deducted, wait for Sedifex and Onco-nurse to finish
-          verification. Submitting another booking may create duplicate records.
+          If your payment has gone through, avoid creating another booking. Our
+          team will use the details you submitted to confirm the next steps.
+        </p>
+        <p className="mt-5 text-sm font-bold text-emerald-200">
+          Powered by Sedifex
         </p>
       </div>
 
