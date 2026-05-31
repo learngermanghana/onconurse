@@ -45,7 +45,7 @@ export default function BookingForm({
     initialService?.id || fallbackInitialService?.id || initialServiceId || "onco-nurse-consultation"
   );
   const [serviceName, setServiceName] = useState(
-    initialService?.name || fallbackInitialService?.name || initialServiceName
+    initialService?.name || fallbackInitialService?.name || initialServiceName || "Onco-nurse Consultation"
   );
   const [slotId, setSlotId] = useState(
     initialService?.slotId || initialSlotId || ""
@@ -93,14 +93,14 @@ export default function BookingForm({
         body: JSON.stringify({
           slotId,
           serviceId: selectedServiceId || "onco-nurse-consultation",
-          serviceName: form.get("serviceName"),
+          serviceName,
           customer: {
             name: form.get("name"),
             phone: form.get("phone"),
             email: form.get("email"),
           },
           country: form.get("country"),
-          pathway: form.get("pathway"),
+          pathway: selectedService?.category || (isSelectedEvent ? "Upcoming Event" : "Consultation"),
           germanLevel: form.get("germanLevel"),
           nursingBackground: form.get("nursingBackground"),
           bookingDate: form.get("bookingDate") || bookingDate || "Date to be announced",
@@ -146,7 +146,7 @@ export default function BookingForm({
         );
         event.currentTarget.reset();
         setSelectedServiceId(fallbackInitialService?.id || "onco-nurse-consultation");
-        setServiceName(fallbackInitialService?.name || "");
+        setServiceName(fallbackInitialService?.name || "Onco-nurse Consultation");
         setSlotId(fallbackInitialService?.slotId || "");
         setBookingDate(fallbackInitialService?.bookingDate || "");
         setBookingTime(fallbackInitialService?.bookingTime || "");
@@ -217,6 +217,7 @@ export default function BookingForm({
       <form onSubmit={submitBooking} className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-xl md:p-8">
         <input type="hidden" name="slotId" value={slotId} />
         <input type="hidden" name="scheduleStatus" value={scheduleStatus} />
+        <input type="hidden" name="serviceName" value={serviceName} />
 
         <div className="grid gap-5 md:grid-cols-2">
           <div className="md:col-span-2">
@@ -245,18 +246,6 @@ export default function BookingForm({
             </div>
           ) : null}
 
-          <div className="md:col-span-2">
-            <label className="label">Service / Interest</label>
-            <input
-              name="serviceName"
-              className="input mt-2"
-              value={serviceName}
-              onChange={(e) => setServiceName(e.target.value)}
-              placeholder="Nursing Ausbildung, FSJ, BFD, Au-Pair, Recognition..."
-              required
-            />
-          </div>
-
           <div>
             <label className="label">Full name</label>
             <input name="name" className="input mt-2" autoComplete="name" required />
@@ -275,20 +264,6 @@ export default function BookingForm({
           <div>
             <label className="label">Current country</label>
             <input name="country" className="input mt-2" placeholder="Ghana" autoComplete="country-name" required />
-          </div>
-
-          <div>
-            <label className="label">Pathway</label>
-            <select name="pathway" className="input mt-2" required defaultValue={isSelectedEvent ? "Upcoming Event" : "Nursing Ausbildung"}>
-              <option>Upcoming Event</option>
-              <option>Nursing Ausbildung</option>
-              <option>FSJ</option>
-              <option>BFD</option>
-              <option>Au-Pair</option>
-              <option>Recognition</option>
-              <option>Student Visa</option>
-              <option>Document Review</option>
-            </select>
           </div>
 
           <div>
@@ -352,7 +327,7 @@ export default function BookingForm({
         {selectedService?.priceLabel && (
           <p className="mt-5 rounded-2xl bg-emerald-50 p-4 text-sm font-bold text-emerald-900">
             {selectedPrice > 0
-              ? `Amount to pay: ${selectedService.priceLabel}. After payment, you will return to the confirmation page while final verification is completed.`
+              ? `Checkout total: ${selectedService.priceLabel}. After payment, Sedifex will return you to the success page while final verification is completed.`
               : "No online payment is required now. Your interest will be registered for follow-up."}
           </p>
         )}
@@ -365,7 +340,7 @@ export default function BookingForm({
           {isSubmitting
             ? "Creating booking..."
             : selectedPrice > 0
-              ? "Book & Pay Securely"
+              ? "Book & Pay with Sedifex"
               : "Register Interest"}
         </button>
 
