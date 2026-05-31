@@ -25,6 +25,46 @@ type BookingFormProps = {
   serviceOptions?: BookingServiceOption[];
 };
 
+const timeOptions = [
+  ["09:00", "9:00 AM"],
+  ["10:00", "10:00 AM"],
+  ["11:00", "11:00 AM"],
+  ["12:00", "12:00 PM"],
+  ["13:00", "1:00 PM"],
+  ["14:00", "2:00 PM"],
+  ["15:00", "3:00 PM"],
+  ["16:00", "4:00 PM"],
+  ["17:00", "5:00 PM"],
+  ["18:00", "6:00 PM"],
+];
+
+function dateInputValue(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
+}
+
+function timeInputValue(value: string) {
+  return value.match(/\b\d{2}:\d{2}\b/)?.[0] || "";
+}
+
+function showDate(value: string) {
+  if (!value) return "Date to be announced";
+  if (!dateInputValue(value)) return value;
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime())
+    ? value
+    : new Intl.DateTimeFormat("en-GB", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }).format(date);
+}
+
+function showTime(value: string) {
+  const clean = timeInputValue(value);
+  return timeOptions.find(([time]) => time === clean)?.[1] || value || "Time to be announced";
+}
+
 export default function BookingForm({
   initialServiceId = "",
   initialServiceName = "",
@@ -38,58 +78,46 @@ export default function BookingForm({
     () => serviceOptions.find((service) => service.id === initialServiceId),
     [initialServiceId, serviceOptions]
   );
+  const fallbackInitialService = serviceOptions[0];
   const [status, setStatus] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const fallbackInitialService = serviceOptions[0];
   const [selectedServiceId, setSelectedServiceId] = useState(
     initialService?.id || fallbackInitialService?.id || initialServiceId || "onco-nurse-consultation"
   );
   const [serviceName, setServiceName] = useState(
     initialService?.name || fallbackInitialService?.name || initialServiceName || "Onco-nurse Consultation"
   );
-  const [slotId, setSlotId] = useState(
-    initialService?.slotId || initialSlotId || ""
-  );
-  const [bookingDate, setBookingDate] = useState(
-    initialService?.bookingDate || initialBookingDate || ""
-  );
-  const [bookingTime, setBookingTime] = useState(
-    initialService?.bookingTime || initialBookingTime || ""
-  );
-  const [scheduleStatus, setScheduleStatus] = useState(
-    initialService?.scheduleStatus || initialScheduleStatus || ""
-  );
+  const [slotId, setSlotId] = useState(initialService?.slotId || initialSlotId || "");
+  const [bookingDate, setBookingDate] = useState(initialService?.bookingDate || initialBookingDate || "");
+  const [bookingTime, setBookingTime] = useState(timeInputValue(initialService?.bookingTime || initialBookingTime || "") || initialService?.bookingTime || initialBookingTime || "");
+  const [scheduleStatus, setScheduleStatus] = useState(initialService?.scheduleStatus || initialScheduleStatus || "");
 
-  const selectedService = serviceOptions.find(
-    (service) => service.id === selectedServiceId
-  );
+  const selectedService = serviceOptions.find((service) => service.id === selectedServiceId);
   const isSelectedEvent = Boolean(slotId || selectedService?.isEvent);
   const selectedPrice = selectedService?.price || 0;
 
   function updateSelectedService(serviceId: string) {
     setSelectedServiceId(serviceId);
-
     const nextService = serviceOptions.find((service) => service.id === serviceId);
     if (!nextService) return;
 
     setServiceName(nextService.name);
     setSlotId(nextService.slotId || "");
     setBookingDate(nextService.bookingDate || "");
-    setBookingTime(nextService.bookingTime || "");
+    setBookingTime(timeInputValue(nextService.bookingTime || "") || nextService.bookingTime || "");
     setScheduleStatus(nextService.scheduleStatus || "");
   }
 
   async function submitBooking(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
     const form = new FormData(event.currentTarget);
-
     setStatus("Creating your booking...");
     setIsSubmitting(true);
 
     try {
       const response = await fetch("/api/bookings", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           slotId,
           serviceId: selectedServiceId || "onco-nurse-consultation",
@@ -115,14 +143,9 @@ export default function BookingForm({
             source: isSelectedEvent ? "manual_upcoming_event" : "website_booking_form",
           },
         }),
-        headers: {
-          "Content-Type": "application/json",
-        },
       });
 
-      const result = await response.json().catch(() => ({
-        error: "Could not read the booking response.",
-      }));
+      const result = await response.json().catch(() => ({ error: "Could not read the booking response." }));
 
       if (response.ok) {
         if (result.checkoutUrl || result.authorizationUrl) {
@@ -137,20 +160,7 @@ export default function BookingForm({
           return;
         }
 
-        setStatus(
-          result.demoMode
-            ? "Booking received. Payment setup is not fully connected yet, so our team will contact you."
-            : `Booking received successfully${
-                result.reference ? ` (${result.reference})` : ""
-              }.`
-        );
-        event.currentTarget.reset();
-        setSelectedServiceId(fallbackInitialService?.id || "onco-nurse-consultation");
-        setServiceName(fallbackInitialService?.name || "Onco-nurse Consultation");
-        setSlotId(fallbackInitialService?.slotId || "");
-        setBookingDate(fallbackInitialService?.bookingDate || "");
-        setBookingTime(fallbackInitialService?.bookingTime || "");
-        setScheduleStatus(fallbackInitialService?.scheduleStatus || "");
+        setStatus(result.demoMode ? "Booking received. Our team will contact you." : `Booking received successfully${result.reference ? ` (${result.reference})` : ""}.`);
       } else {
         setStatus(result.error || "Could not submit booking.");
       }
@@ -165,43 +175,11 @@ export default function BookingForm({
     <section className="section grid gap-10 md:grid-cols-[0.8fr_1.2fr]">
       <div>
         <span className="badge">Book Consultation</span>
-
         <h1 className="section-title mt-4">Start your Germany pathway with guidance</h1>
-
         <p className="section-subtitle">
           Choose the service or event you are interested in, fill in your details,
-          and submit your booking. If payment is required, you will be sent to a
-          secure payment page before final confirmation.
+          and submit your booking.
         </p>
-
-        <div className="mt-8 rounded-3xl border border-emerald-100 bg-white p-6 shadow-sm">
-          <p className="text-sm font-black uppercase tracking-[0.16em] text-emerald-700">
-            What happens after you book?
-          </p>
-          <ol className="mt-4 space-y-4 text-sm leading-6 text-slate-600">
-            <li>
-              <span className="font-black text-slate-950">1. Choose your support:</span>{" "}
-              Select a consultation, document review, visa support, nursing pathway,
-              or upcoming event.
-            </li>
-            <li>
-              <span className="font-black text-slate-950">2. Share your details:</span>{" "}
-              Enter your name, WhatsApp number, current country, German level and
-              preferred date or time.
-            </li>
-            <li>
-              <span className="font-black text-slate-950">3. Submit your booking:</span>{" "}
-              We save your request so our team can prepare the right guidance for you.
-            </li>
-            <li>
-              <span className="font-black text-slate-950">4. Payment or follow-up:</span>{" "}
-              If the service has a fee, you will pay securely online. If it is an
-              enquiry or date/time is not confirmed yet, we will contact you with
-              the next steps.
-            </li>
-          </ol>
-        </div>
-
         <div className="mt-8 rounded-3xl bg-slate-950 p-6 text-white">
           <p className="font-black">We can help with:</p>
           <ul className="mt-4 space-y-3 text-slate-300">
@@ -222,16 +200,8 @@ export default function BookingForm({
         <div className="grid gap-5 md:grid-cols-2">
           <div className="md:col-span-2">
             <label className="label">Service or upcoming event</label>
-            <select
-              name="serviceId"
-              className="input mt-2"
-              value={selectedServiceId}
-              onChange={(e) => updateSelectedService(e.target.value)}
-              required
-            >
-              <option value="onco-nurse-consultation" disabled={serviceOptions.length > 0}>
-                General Onco-nurse consultation
-              </option>
+            <select name="serviceId" className="input mt-2" value={selectedServiceId} onChange={(e) => updateSelectedService(e.target.value)} required>
+              <option value="onco-nurse-consultation" disabled={serviceOptions.length > 0}>General Onco-nurse consultation</option>
               {serviceOptions.map((service) => (
                 <option key={`${service.id}-${service.slotId || "service"}`} value={service.id}>
                   {service.name}{service.priceLabel ? ` — ${service.priceLabel}` : ""}
@@ -242,113 +212,67 @@ export default function BookingForm({
 
           {isSelectedEvent ? (
             <div className="md:col-span-2 rounded-2xl bg-amber-50 p-4 text-sm font-bold text-amber-900">
-              You selected an upcoming event. Submit your details and we will reserve or confirm your interest for this session.
+              Event date and time are filled automatically.
             </div>
           ) : null}
 
-          <div>
-            <label className="label">Full name</label>
-            <input name="name" className="input mt-2" autoComplete="name" required />
-          </div>
-
-          <div>
-            <label className="label">Phone / WhatsApp</label>
-            <input name="phone" className="input mt-2" autoComplete="tel" required />
-          </div>
-
-          <div>
-            <label className="label">Email</label>
-            <input name="email" type="email" className="input mt-2" autoComplete="email" />
-          </div>
-
-          <div>
-            <label className="label">Current country</label>
-            <input name="country" className="input mt-2" placeholder="Ghana" autoComplete="country-name" required />
-          </div>
+          <div><label className="label">Full name</label><input name="name" className="input mt-2" autoComplete="name" required /></div>
+          <div><label className="label">Phone / WhatsApp</label><input name="phone" className="input mt-2" autoComplete="tel" required /></div>
+          <div><label className="label">Email</label><input name="email" type="email" className="input mt-2" autoComplete="email" /></div>
+          <div><label className="label">Current country</label><input name="country" className="input mt-2" placeholder="Ghana" autoComplete="country-name" required /></div>
 
           <div>
             <label className="label">German level</label>
             <select name="germanLevel" className="input mt-2">
-              <option>No German yet</option>
-              <option>A1</option>
-              <option>A2</option>
-              <option>B1</option>
-              <option>B2</option>
-              <option>C1</option>
+              <option>No German yet</option><option>A1</option><option>A2</option><option>B1</option><option>B2</option><option>C1</option>
             </select>
           </div>
 
           <div>
             <label className="label">Nursing background</label>
             <select name="nursingBackground" className="input mt-2">
-              <option>I am not yet a nurse</option>
-              <option>I am a nursing student</option>
-              <option>I am a trained nurse</option>
-              <option>I work in healthcare</option>
+              <option>I am not yet a nurse</option><option>I am a nursing student</option><option>I am a trained nurse</option><option>I work in healthcare</option>
             </select>
           </div>
 
           <div>
             <label className="label">Preferred date</label>
-            <input
-              name="bookingDate"
-              type="text"
-              className="input mt-2"
-              value={bookingDate}
-              onChange={(e) => setBookingDate(e.target.value)}
-              placeholder="Date to be announced"
-              required
-            />
+            {isSelectedEvent ? (
+              <><input type="hidden" name="bookingDate" value={bookingDate || "Date to be announced"} /><div className="input mt-2 flex items-center bg-slate-50 text-slate-700">{showDate(bookingDate)}</div></>
+            ) : (
+              <input name="bookingDate" type="date" className="input mt-2" value={dateInputValue(bookingDate)} onChange={(e) => setBookingDate(e.target.value)} required />
+            )}
           </div>
 
           <div>
             <label className="label">Preferred time</label>
-            <input
-              name="bookingTime"
-              type="text"
-              className="input mt-2"
-              value={bookingTime}
-              onChange={(e) => setBookingTime(e.target.value)}
-              placeholder="Time to be announced"
-              required
-            />
+            {isSelectedEvent ? (
+              <><input type="hidden" name="bookingTime" value={bookingTime || "Time to be announced"} /><div className="input mt-2 flex items-center bg-slate-50 text-slate-700">{showTime(bookingTime)}</div></>
+            ) : (
+              <select name="bookingTime" className="input mt-2" value={timeInputValue(bookingTime)} onChange={(e) => setBookingTime(e.target.value)} required>
+                <option value="">Select time</option>
+                {timeOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            )}
           </div>
 
           <div className="md:col-span-2">
             <label className="label">Message</label>
-            <textarea
-              name="notes"
-              className="input mt-2 min-h-32"
-              placeholder="Tell us your background, German level, documents or Germany goal."
-            />
+            <textarea name="notes" className="input mt-2 min-h-32" placeholder="Tell us your background, German level, documents or Germany goal." />
           </div>
         </div>
 
         {selectedService?.priceLabel && (
           <p className="mt-5 rounded-2xl bg-emerald-50 p-4 text-sm font-bold text-emerald-900">
-            {selectedPrice > 0
-              ? `Checkout total: ${selectedService.priceLabel}. After payment, Sedifex will return you to the success page while final verification is completed.`
-              : "No online payment is required now. Your interest will be registered for follow-up."}
+            {selectedPrice > 0 ? `Checkout total: ${selectedService.priceLabel}.` : "No online payment is required now. Your interest will be registered for follow-up."}
           </p>
         )}
 
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="mt-6 w-full rounded-full bg-emerald-700 px-6 py-4 font-black text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-        >
-          {isSubmitting
-            ? "Creating booking..."
-            : selectedPrice > 0
-              ? "Book & Pay with Sedifex"
-              : "Register Interest"}
+        <button type="submit" disabled={isSubmitting} className="mt-6 w-full rounded-full bg-emerald-700 px-6 py-4 font-black text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-400">
+          {isSubmitting ? "Creating booking..." : selectedPrice > 0 ? "Book & Pay with Sedifex" : "Register Interest"}
         </button>
 
-        {status && (
-          <div className="mt-5 rounded-2xl bg-emerald-50 p-4 text-sm font-bold text-emerald-800">
-            {status}
-          </div>
-        )}
+        {status && <div className="mt-5 rounded-2xl bg-emerald-50 p-4 text-sm font-bold text-emerald-800">{status}</div>}
       </form>
     </section>
   );
