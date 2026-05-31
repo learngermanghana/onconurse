@@ -3,6 +3,7 @@ import {
   createSedifexBooking,
   createSedifexBookingCheckout,
   getSedifexCheckoutReturnUrl,
+  type SedifexBookingInput,
 } from "../../../lib/sedifex";
 
 export const dynamic = "force-dynamic";
@@ -91,7 +92,7 @@ export async function POST(request: Request) {
       .filter(Boolean)
       .join("\n");
 
-    const baseInput = {
+    const baseInput: SedifexBookingInput & { slotId?: string } = {
       slotId: slotId || undefined,
       serviceId,
       serviceName,
@@ -119,7 +120,7 @@ export async function POST(request: Request) {
 
     if (paymentAmount <= 0) {
       const booking = await createSedifexBooking({
-        ...(baseInput as any),
+        ...baseInput,
         paymentMethod: "manual",
         bookingStatus: "booked",
         paymentCollectionMode: "manual",
@@ -137,7 +138,7 @@ export async function POST(request: Request) {
     }
 
     const result = await createSedifexBookingCheckout({
-      ...(baseInput as any),
+      ...baseInput,
       paymentMethod: "paystack_checkout",
       returnUrl: getSedifexCheckoutReturnUrl(successUrl),
     });
