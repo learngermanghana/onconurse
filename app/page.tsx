@@ -31,7 +31,7 @@ export default async function HomePage() {
   const secondaryCtaLabel = hero?.secondaryCtaLabel || "Join our mailing list";
 
   const whatsapp = whatsappLink(
-    profile?.whatsappNumber || site.whatsapp,
+    site.whatsapp,
     "Hello Onco-nurse, I want guidance for Germany nursing pathway."
   );
 

@@ -209,7 +209,15 @@ function normalizeDescription(description: string): string {
 }
 
 function normalizeCategory(category: string): string {
-  return /^not provided$/i.test(category.trim()) ? "" : category.trim();
+  const trimmed = category.trim();
+
+  if (/^(?:not provided|beauty training)$/i.test(trimmed)) return "";
+
+  return trimmed;
+}
+
+function normalizeServiceLabel(label: string): string {
+  return /^beauty training$/i.test(label.trim()) ? "" : label.trim();
 }
 
 const preferredServiceNames = [
@@ -271,7 +279,7 @@ function normalizeService(raw: unknown, index: number): SedifexService {
     imageUrls,
     imageAlt: readString(record, ["imageAlt", "image_alt", "alt"], name),
     updatedAt: readString(record, ["updatedAt", "updated_at"]) || undefined,
-    tag: readString(record, ["tag", "badge", "badgeLabel", "badge_label", "label"]) || undefined,
+    tag: normalizeServiceLabel(readString(record, ["tag", "badge", "badgeLabel", "badge_label", "label"])) || undefined,
     sortOrder: readNumber(record, ["sortOrder", "sort_order", "order", "position"]),
     order: readNumber(record, ["order"]),
   };

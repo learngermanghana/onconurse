@@ -52,6 +52,7 @@ function Header({ social }: { social: SedifexSocialSettings | null }) {
           <Link href="/services">Services</Link>
           <Link href="/blog">Blog</Link>
           <Link href="/events">Upcoming Events</Link>
+          <Link href="/faq">FAQ</Link>
           <Link href="/about">About</Link>
           <Link href="/contact">Contact</Link>
         </nav>
@@ -82,13 +83,12 @@ function Footer({ social }: { social: SedifexSocialSettings | null }) {
   const profile = social?.profile;
   const socialLinks = social?.socialLinks || {};
   const contactLines = [
-    profile?.publicEmail || site.email,
-    profile?.publicPhone || site.phone,
-    profile?.whatsappNumber ? `WhatsApp: ${profile.whatsappNumber}` : "",
-    [profile?.addressLine1, profile?.city, profile?.country]
-      .filter(Boolean)
-      .join(", "),
-  ].filter(Boolean);
+    { label: "Email", value: site.email },
+    { label: "Phone", value: site.phone },
+    { label: "WhatsApp", value: site.whatsapp },
+    { label: "Address", value: site.address },
+    { label: "TikTok", value: site.tiktok },
+  ];
   const renderedSocialLinks = Object.entries(socialLinks).flatMap(([key, href]) =>
     href ? [{ key, href }] : []
   );
@@ -115,6 +115,7 @@ function Footer({ social }: { social: SedifexSocialSettings | null }) {
             <Link href="/services">Services</Link>
             <Link href="/blog">Blog</Link>
             <Link href="/events">Upcoming Events</Link>
+            <Link href="/faq">FAQ</Link>
             <a href={site.mailingListUrl} target="_blank" rel="noreferrer">
               Join Mailing List
             </a>
@@ -125,8 +126,10 @@ function Footer({ social }: { social: SedifexSocialSettings | null }) {
         <div>
           <p className="font-bold">Contact</p>
           <div className="mt-4 grid gap-2 text-sm text-slate-300">
-            {contactLines.map((line) => (
-              <span key={line}>{line}</span>
+            {contactLines.map(({ label, value }) => (
+              <span key={label}>
+                <strong className="text-white">{label}:</strong> {value}
+              </span>
             ))}
             {renderedSocialLinks.map(({ key, href }) => (
               <a key={key} href={href} target="_blank" rel="noreferrer">
@@ -140,10 +143,10 @@ function Footer({ social }: { social: SedifexSocialSettings | null }) {
   );
 }
 
-function FloatingWhatsApp({ social }: { social: SedifexSocialSettings | null }) {
+function FloatingWhatsApp() {
   const message =
     "Hello Onco-nurse, I want guidance for Germany nursing pathway.";
-  const whatsappNumber = social?.profile?.whatsappNumber || site.whatsapp;
+  const whatsappNumber = site.whatsapp;
 
   return (
     <a
@@ -170,7 +173,7 @@ export default async function RootLayout({
         <Header social={social} />
         <main>{children}</main>
         <Footer social={social} />
-        <FloatingWhatsApp social={social} />
+        <FloatingWhatsApp />
       </body>
     </html>
   );

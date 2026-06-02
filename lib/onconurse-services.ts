@@ -94,7 +94,15 @@ function isServiceItem(item: unknown) {
 }
 
 function cleanCategory(category: string) {
-  return /^not provided$/i.test(category.trim()) ? "" : category.trim();
+  const trimmed = category.trim();
+
+  if (/^(?:not provided|beauty training)$/i.test(trimmed)) return "";
+
+  return trimmed;
+}
+
+function cleanServiceLabel(label: string) {
+  return /^beauty training$/i.test(label.trim()) ? "" : label.trim();
 }
 
 function normalizeServiceDescription(description: string) {
@@ -132,7 +140,7 @@ function mapSedifexItem(raw: unknown, index: number): SedifexService | null {
     imageUrls,
     imageAlt: readString(raw, ["imageAlt"], name),
     updatedAt: readString(raw, ["updatedAt"]) || undefined,
-    tag: readString(raw, ["tag", "badge", "label"]) || undefined,
+    tag: cleanServiceLabel(readString(raw, ["tag", "badge", "label"])) || undefined,
     sortOrder: readNumber(raw, ["sortOrder"]),
     order: readNumber(raw, ["order"]),
   };
