@@ -5,6 +5,7 @@ import { site } from "../lib/site";
 import {
   getSedifexSocialSettings,
   type SedifexSocialSettings,
+  normalizeSedifexPhoneNumber,
   whatsappLink,
 } from "../lib/sedifex";
 import "./globals.css";
@@ -82,13 +83,16 @@ function Header({ social }: { social: SedifexSocialSettings | null }) {
 function Footer({ social }: { social: SedifexSocialSettings | null }) {
   const profile = social?.profile;
   const socialLinks = social?.socialLinks || {};
+  const phone = normalizeSedifexPhoneNumber(profile?.publicPhone) || site.phone;
+  const whatsapp =
+    normalizeSedifexPhoneNumber(profile?.whatsappNumber) || site.whatsapp;
   const contactLines = [
-    { label: "Email", value: site.email },
-    { label: "Phone", value: site.phone },
-    { label: "WhatsApp", value: site.whatsapp },
-    { label: "Address", value: site.address },
+    { label: "Email", value: profile?.publicEmail || site.email },
+    { label: "Phone", value: phone },
+    { label: "WhatsApp", value: whatsapp },
+    { label: "Address", value: profile?.addressLine1 || site.address },
     { label: "TikTok", value: site.tiktok },
-  ];
+  ].filter(({ value }) => value);
   const renderedSocialLinks = Object.entries(socialLinks).flatMap(([key, href]) =>
     href ? [{ key, href }] : []
   );
@@ -120,6 +124,8 @@ function Footer({ social }: { social: SedifexSocialSettings | null }) {
               Join Mailing List
             </a>
             <Link href="/book">Book Consultation</Link>
+            <Link href="/privacy">Privacy Policy</Link>
+            <Link href="/terms">Terms of Service</Link>
           </div>
         </div>
 
@@ -143,10 +149,11 @@ function Footer({ social }: { social: SedifexSocialSettings | null }) {
   );
 }
 
-function FloatingWhatsApp() {
+function FloatingWhatsApp({ social }: { social: SedifexSocialSettings | null }) {
   const message =
     "Hello Onco-nurse, I want guidance for Germany nursing pathway.";
-  const whatsappNumber = site.whatsapp;
+  const whatsappNumber =
+    normalizeSedifexPhoneNumber(social?.profile?.whatsappNumber) || site.whatsapp;
 
   return (
     <a
@@ -173,7 +180,7 @@ export default async function RootLayout({
         <Header social={social} />
         <main>{children}</main>
         <Footer social={social} />
-        <FloatingWhatsApp />
+        <FloatingWhatsApp social={social} />
       </body>
     </html>
   );

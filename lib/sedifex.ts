@@ -176,6 +176,23 @@ function hasUsableValue(value: string) {
   return Boolean(value && !value.includes("PASTE_") && !value.includes("YOUR_"));
 }
 
+function isEmptySedifexPhoneNumber(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (!digits || /^0+$/.test(digits)) return true;
+
+  const ghanaLocalDigits = digits.startsWith("233") ? digits.slice(3) : "";
+  return Boolean(ghanaLocalDigits && /^0+$/.test(ghanaLocalDigits));
+}
+
+export function normalizeSedifexPhoneNumber(value?: string | null) {
+  if (!value) return undefined;
+
+  const trimmed = value.trim();
+  if (!trimmed || isEmptySedifexPhoneNumber(trimmed)) return undefined;
+
+  return trimmed;
+}
+
 export function isSedifexStoreConfigured() {
   return hasUsableValue(SEDIFEX_STORE_ID);
 }
@@ -587,7 +604,24 @@ export async function getSedifexHeroSlides(): Promise<SedifexHeroSlide[]> {
 }
 
 export async function getSedifexSocialSettings(): Promise<SedifexSocialSettings | null> {
-  return sedifexGet("/v1IntegrationSocialSettings", {}, 60);
+  const settings = await sedifexGet<SedifexSocialSettings>(
+    "/v1IntegrationSocialSettings",
+    {},
+    60
+  );
+  if (!settings?.profile) return settings;
+
+  return {
+    ...settings,
+    profile: {
+      ...settings.profile,
+      publicPhone: normalizeSedifexPhoneNumber(settings.profile.publicPhone),
+      whatsappNumber: normalizeSedifexPhoneNumber(
+        settings.profile.whatsappNumber
+      ),
+      telegramNumber: normalizeSedifexPhoneNumber(settings.profile.telegramNumber),
+    },
+  };
 }
 
 type SedifexRecord = Record<string, unknown>;
