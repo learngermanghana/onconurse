@@ -1,11 +1,18 @@
 import Link from "next/link";
-import { whatsappLink } from "../../lib/sedifex";
+import {
+  getSedifexSocialSettings,
+  normalizeSedifexPhoneNumber,
+  whatsappLink,
+} from "../../lib/sedifex";
 import { site } from "../../lib/site";
 
-export default function ContactPage() {
-  const phone = site.phone;
-  const whatsappNumber = site.whatsapp;
-  const email = site.email;
+export default async function ContactPage() {
+  const social = await getSedifexSocialSettings();
+  const profile = social?.profile;
+  const phone = normalizeSedifexPhoneNumber(profile?.publicPhone) || site.phone;
+  const whatsappNumber =
+    normalizeSedifexPhoneNumber(profile?.whatsappNumber) || site.whatsapp;
+  const email = profile?.publicEmail || site.email;
 
   return (
     <section className="section">
