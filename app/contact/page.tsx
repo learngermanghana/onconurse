@@ -9,10 +9,12 @@ import { site } from "../../lib/site";
 export default async function ContactPage() {
   const social = await getSedifexSocialSettings();
   const profile = social?.profile;
-  const phone = normalizeSedifexPhoneNumber(profile?.publicPhone) || site.phone;
+  const phone = normalizeSedifexPhoneNumber(profile?.publicPhone);
   const whatsappNumber =
     normalizeSedifexPhoneNumber(profile?.whatsappNumber) || site.whatsapp;
   const email = profile?.publicEmail || site.email;
+  const address = profile?.addressLine1 || site.address;
+  const tiktok = profile?.tiktokHandle || site.tiktok;
 
   return (
     <section className="section">
@@ -25,7 +27,7 @@ export default async function ContactPage() {
         Visa guidance.
       </p>
 
-      <div className="mt-10 grid gap-6 md:grid-cols-3">
+      <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <a
           href={whatsappLink(whatsappNumber)}
           target="_blank"
@@ -39,19 +41,37 @@ export default async function ContactPage() {
           <p className="mt-3 text-emerald-50">{whatsappNumber}</p>
         </a>
 
-        <div className="rounded-3xl bg-white p-7 shadow-sm">
-          <p className="text-sm font-bold uppercase tracking-widest text-slate-500">
-            Phone
-          </p>
-          <p className="mt-3 text-2xl font-black text-slate-950">{phone}</p>
-        </div>
+        {phone && (
+          <div className="rounded-3xl bg-white p-7 shadow-sm">
+            <p className="text-sm font-bold uppercase tracking-widest text-slate-500">
+              Phone
+            </p>
+            <p className="mt-3 text-2xl font-black text-slate-950">{phone}</p>
+          </div>
+        )}
 
-        <div className="rounded-3xl bg-white p-7 shadow-sm">
+        <a href={`mailto:${email}`} className="rounded-3xl bg-white p-7 shadow-sm">
           <p className="text-sm font-bold uppercase tracking-widest text-slate-500">
             Email
           </p>
           <p className="mt-3 break-words text-2xl font-black text-slate-950">
             {email}
+          </p>
+        </a>
+
+        <div className="rounded-3xl bg-white p-7 shadow-sm">
+          <p className="text-sm font-bold uppercase tracking-widest text-slate-500">
+            Address
+          </p>
+          <p className="mt-3 text-2xl font-black text-slate-950">{address}</p>
+        </div>
+
+        <div className="rounded-3xl bg-white p-7 shadow-sm">
+          <p className="text-sm font-bold uppercase tracking-widest text-slate-500">
+            TikTok
+          </p>
+          <p className="mt-3 break-words text-2xl font-black text-slate-950">
+            {tiktok}
           </p>
         </div>
       </div>

@@ -83,7 +83,7 @@ function Header({ social }: { social: SedifexSocialSettings | null }) {
 function Footer({ social }: { social: SedifexSocialSettings | null }) {
   const profile = social?.profile;
   const socialLinks = social?.socialLinks || {};
-  const phone = normalizeSedifexPhoneNumber(profile?.publicPhone) || site.phone;
+  const phone = normalizeSedifexPhoneNumber(profile?.publicPhone);
   const whatsapp =
     normalizeSedifexPhoneNumber(profile?.whatsappNumber) || site.whatsapp;
   const contactLines = [
@@ -91,7 +91,7 @@ function Footer({ social }: { social: SedifexSocialSettings | null }) {
     { label: "Phone", value: phone },
     { label: "WhatsApp", value: whatsapp },
     { label: "Address", value: profile?.addressLine1 || site.address },
-    { label: "TikTok", value: site.tiktok },
+    { label: "TikTok", value: profile?.tiktokHandle || site.tiktok },
   ].filter(({ value }) => value);
   const renderedSocialLinks = Object.entries(socialLinks).flatMap(([key, href]) =>
     href ? [{ key, href }] : []
