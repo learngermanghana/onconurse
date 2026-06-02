@@ -1157,9 +1157,17 @@ export function slugify(value: string) {
 
 export function formatPrice(price?: number) {
   if (!price || price <= 0) return "Enquire";
-  return `GHS ${new Intl.NumberFormat("en-GH", {
+
+  const cedis = new Intl.NumberFormat("en-GH", {
     maximumFractionDigits: 0,
-  }).format(price)}`;
+  }).format(price);
+  const euros = new Intl.NumberFormat("en-DE", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0,
+  }).format(price / site.ghsPerEuro);
+
+  return `GHS ${cedis} / approx. ${euros}`;
 }
 
 export function whatsappLink(phone?: string, message?: string) {

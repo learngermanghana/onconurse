@@ -4,9 +4,12 @@ export const site = {
   tagline: "Helping African nurses start their Germany journey",
   description:
     "Specialising in Oncology nursing guidance, Nursing Ausbildung in Germany, FSJ, BFD, Au-Pair, Recognition and Student Visa support.",
-  phone: "+233000000000",
-  email: "hello@onconurse.com",
-  whatsapp: "+233000000000",
+  phone: "+4915218947564",
+  email: "health.artistrymatters@gmail.com",
+  whatsapp: "+233544345271",
+  address: "Bamaaya Lane 6, Tema, Ghana",
+  tiktok: "@onco_nurse",
+  ghsPerEuro: 13.5,
   mailingListUrl: "https://sedifex.com/join-customers/f2c9f4ae391d41caa9431b9e",
 };
 
