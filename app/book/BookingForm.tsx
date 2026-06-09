@@ -1,6 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import {
+  validateBookingContact,
+  type BookingContactErrors,
+  type BookingContactField,
+} from "../../lib/booking-validation";
 
 type BookingServiceOption = {
   id: string;
@@ -93,6 +98,8 @@ export default function BookingForm({
     ? bookingOptionKey(fallbackInitialService)
     : "onco-nurse-consultation";
   const [status, setStatus] = useState("");
+  const [hasSubmissionError, setHasSubmissionError] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<BookingContactErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedOptionKey, setSelectedOptionKey] = useState(
     initialService ? bookingOptionKey(initialService) : fallbackOptionKey
@@ -129,9 +136,34 @@ export default function BookingForm({
     setScheduleStatus(nextService.scheduleStatus || "");
   }
 
+  function clearFieldError(field: BookingContactField) {
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  }
+
   async function submitBooking(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    const contactValidation = validateBookingContact({
+      name: form.get("name"),
+      phone: form.get("phone"),
+      email: form.get("email"),
+      country: form.get("country"),
+    });
+
+    if (!contactValidation.isValid) {
+      setFieldErrors(contactValidation.errors);
+      setHasSubmissionError(true);
+      setStatus("Please correct the highlighted contact details before continuing.");
+      return;
+    }
+
+    setFieldErrors({});
+    setHasSubmissionError(false);
     setStatus("Creating your booking...");
     setIsSubmitting(true);
 
@@ -144,11 +176,11 @@ export default function BookingForm({
           serviceId: selectedServiceId || "onco-nurse-consultation",
           serviceName,
           customer: {
-            name: form.get("name"),
-            phone: form.get("phone"),
-            email: form.get("email"),
+            name: contactValidation.contact.name,
+            phone: contactValidation.contact.phone,
+            email: contactValidation.contact.email,
           },
-          country: form.get("country"),
+          country: contactValidation.contact.country,
           pathway: selectedService?.category || (isSelectedEvent ? "Upcoming Event" : "Consultation"),
           germanLevel: form.get("germanLevel"),
           nursingBackground: form.get("nursingBackground"),
@@ -169,6 +201,7 @@ export default function BookingForm({
       const result = await response.json().catch(() => ({ error: "Could not read the booking response." }));
 
       if (response.ok) {
+        setHasSubmissionError(false);
         if (result.checkoutUrl || result.authorizationUrl) {
           setStatus("Booking saved. Redirecting to the secure payment page...");
           window.location.assign(result.checkoutUrl || result.authorizationUrl);
@@ -183,9 +216,12 @@ export default function BookingForm({
 
         setStatus(result.demoMode ? "Booking received. Our team will contact you." : `Booking received successfully${result.reference ? ` (${result.reference})` : ""}.`);
       } else {
+        setFieldErrors(result.fieldErrors || {});
+        setHasSubmissionError(true);
         setStatus(result.error || "Could not submit booking.");
       }
     } catch {
+      setHasSubmissionError(true);
       setStatus("Network error. Please try again or contact Onco-nurse on WhatsApp.");
     } finally {
       setIsSubmitting(false);
@@ -246,10 +282,26 @@ export default function BookingForm({
             </div>
           ) : null}
 
-          <div><label className="label">Full name</label><input name="name" className="input mt-2" autoComplete="name" required /></div>
-          <div><label className="label">Phone / WhatsApp</label><input name="phone" className="input mt-2" autoComplete="tel" required /></div>
-          <div><label className="label">Email</label><input name="email" type="email" className="input mt-2" autoComplete="email" /></div>
-          <div><label className="label">Current country</label><input name="country" className="input mt-2" placeholder="Ghana" autoComplete="country-name" required /></div>
+          <div>
+            <label className="label" htmlFor="name">Full name</label>
+            <input id="name" name="name" className="input mt-2" autoComplete="name" minLength={4} maxLength={80} aria-invalid={Boolean(fieldErrors.name)} aria-describedby={fieldErrors.name ? "name-error" : "name-help"} onChange={() => clearFieldError("name")} required />
+            <p id={fieldErrors.name ? "name-error" : "name-help"} className={`mt-2 text-xs ${fieldErrors.name ? "font-bold text-red-700" : "text-slate-500"}`}>{fieldErrors.name || "Enter your first and last name."}</p>
+          </div>
+          <div>
+            <label className="label" htmlFor="phone">Phone / WhatsApp</label>
+            <input id="phone" name="phone" type="tel" className="input mt-2" autoComplete="tel" inputMode="tel" maxLength={24} placeholder="+233 24 681 3579" aria-invalid={Boolean(fieldErrors.phone)} aria-describedby={fieldErrors.phone ? "phone-error" : "phone-help"} onChange={() => clearFieldError("phone")} required />
+            <p id={fieldErrors.phone ? "phone-error" : "phone-help"} className={`mt-2 text-xs ${fieldErrors.phone ? "font-bold text-red-700" : "text-slate-500"}`}>{fieldErrors.phone || "Include your country code so we can reach you."}</p>
+          </div>
+          <div>
+            <label className="label" htmlFor="email">Email <span className="font-normal text-slate-500">(optional)</span></label>
+            <input id="email" name="email" type="email" className="input mt-2" autoComplete="email" inputMode="email" maxLength={254} placeholder="name@example.com" aria-invalid={Boolean(fieldErrors.email)} aria-describedby={fieldErrors.email ? "email-error" : "email-help"} onChange={() => clearFieldError("email")} />
+            <p id={fieldErrors.email ? "email-error" : "email-help"} className={`mt-2 text-xs ${fieldErrors.email ? "font-bold text-red-700" : "text-slate-500"}`}>{fieldErrors.email || "Used for booking and payment confirmation."}</p>
+          </div>
+          <div>
+            <label className="label" htmlFor="country">Current country</label>
+            <input id="country" name="country" className="input mt-2" placeholder="Ghana" autoComplete="country-name" minLength={2} maxLength={56} aria-invalid={Boolean(fieldErrors.country)} aria-describedby={fieldErrors.country ? "country-error" : undefined} onChange={() => clearFieldError("country")} required />
+            {fieldErrors.country && <p id="country-error" className="mt-2 text-xs font-bold text-red-700">{fieldErrors.country}</p>}
+          </div>
 
           <div>
             <label className="label">German level</label>
@@ -302,7 +354,7 @@ export default function BookingForm({
           {isSubmitting ? "Creating booking..." : selectedPrice > 0 ? "Book & Pay with Sedifex" : "Register Interest"}
         </button>
 
-        {status && <div className="mt-5 rounded-2xl bg-emerald-50 p-4 text-sm font-bold text-emerald-800">{status}</div>}
+        {status && <div role={hasSubmissionError ? "alert" : "status"} className={`mt-5 rounded-2xl p-4 text-sm font-bold ${hasSubmissionError ? "bg-red-50 text-red-800" : "bg-emerald-50 text-emerald-800"}`}>{status}</div>}
       </form>
     </section>
   );

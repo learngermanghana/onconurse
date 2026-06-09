@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { validateBookingContact } from "../../../lib/booking-validation";
 import {
   createSedifexBooking,
   createSedifexBookingCheckout,
@@ -44,16 +45,22 @@ export async function POST(request: Request) {
     const customerInput = getNestedRecord(body, "customer");
     const attributesInput = getNestedRecord(body, "attributes");
 
-    const customer = {
+    const contactValidation = validateBookingContact({
       name: getString(customerInput, "name"),
       email: getString(customerInput, "email"),
       phone: getString(customerInput, "phone"),
+      country: getString(body, "country"),
+    });
+    const customer = {
+      name: contactValidation.contact.name,
+      email: contactValidation.contact.email,
+      phone: contactValidation.contact.phone,
     };
 
     const slotId = getString(body, "slotId");
     const serviceId = getString(body, "serviceId") || "onco-nurse-consultation";
     const serviceName = getString(body, "serviceName") || "Onco-nurse Consultation";
-    const country = getString(body, "country");
+    const country = contactValidation.contact.country;
     const pathway = getString(body, "pathway");
     const germanLevel = getString(body, "germanLevel");
     const nursingBackground = getString(body, "nursingBackground");
@@ -62,16 +69,13 @@ export async function POST(request: Request) {
     const bookingTime = getString(body, "bookingTime") || "Time to be announced";
     const scheduleStatus = getString(body, "scheduleStatus");
 
-    if (!customer.name || !customer.phone) {
+    if (!contactValidation.isValid) {
       return NextResponse.json(
-        { ok: false, error: "Name and phone are required." },
-        { status: 400 }
-      );
-    }
-
-    if (customer.email && !/^\S+@\S+\.\S+$/.test(customer.email)) {
-      return NextResponse.json(
-        { ok: false, error: "Enter a valid email address or leave the email field empty." },
+        {
+          ok: false,
+          error: "Please check your contact details before continuing.",
+          fieldErrors: contactValidation.errors,
+        },
         { status: 400 }
       );
     }

@@ -202,3 +202,8 @@ a {
   height: auto;
   border-radius: 1.5rem;
 }
+
+.input[aria-invalid="true"] {
+  border-color: #b91c1c;
+  box-shadow: 0 0 0 3px #fee2e2;
+}
