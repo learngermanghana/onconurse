@@ -49,9 +49,8 @@ export default async function HomePage() {
             </h1>
 
             <p className="mt-6 max-w-2xl text-xl leading-9 text-slate-700">
-              {hero?.subtitle ||
-                profile?.tagline ||
-                "We help African nurses and applicants navigate Nursing Ausbildung, FSJ, BFD, Au-Pair, Recognition and Student Visa pathways in Germany."}
+              We help you navigate the different types of Health care Ausbildung,
+              FSJ,BFD Au-Pair, recognition and student visa pathways
             </p>
 
             <div className="mt-8 flex flex-wrap gap-4">
