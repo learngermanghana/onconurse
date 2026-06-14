@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { validateBookingContact } from "../../../lib/booking-validation";
+import {
+  isWeekendBookingDate,
+  validateBookingContact,
+  weekendBookingError,
+} from "../../../lib/booking-validation";
 import {
   createSedifexBooking,
   createSedifexBookingCheckout,
@@ -38,6 +42,10 @@ function getNumber(record: JsonRecord, key: string) {
   return undefined;
 }
 
+function getBoolean(record: JsonRecord, key: string) {
+  return record[key] === true;
+}
+
 export async function POST(request: Request) {
   try {
     const payload: unknown = await request.json();
@@ -68,6 +76,7 @@ export async function POST(request: Request) {
     const bookingDate = getString(body, "bookingDate") || "Date to be announced";
     const bookingTime = getString(body, "bookingTime") || "Time to be announced";
     const scheduleStatus = getString(body, "scheduleStatus");
+    const isEventBooking = Boolean(slotId) || getBoolean(body, "isEvent");
 
     if (!contactValidation.isValid) {
       return NextResponse.json(
@@ -80,10 +89,17 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!isEventBooking && !isWeekendBookingDate(bookingDate)) {
+      return NextResponse.json(
+        { ok: false, error: weekendBookingError },
+        { status: 400 }
+      );
+    }
+
     const paymentAmount = getNumber(body, "paymentAmount") ?? 0;
     const requestUrl = new URL(request.url);
     const successUrl = new URL("/payment/success", requestUrl.origin).toString();
-    const source = slotId ? "manual_upcoming_event" : "website_booking_form";
+    const source = isEventBooking ? "manual_upcoming_event" : "website_booking_form";
     const combinedNotes = [
       country ? `Country: ${country}` : "",
       pathway ? `Pathway: ${pathway}` : "",
