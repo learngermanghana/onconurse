@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import {
+  isWeekendBookingDate,
   validateBookingContact,
+  weekendBookingError,
   type BookingContactErrors,
   type BookingContactField,
 } from "../../lib/booking-validation";
@@ -162,6 +164,13 @@ export default function BookingForm({
       return;
     }
 
+    const submittedBookingDate = form.get("bookingDate") || bookingDate;
+    if (!isSelectedEvent && !isWeekendBookingDate(submittedBookingDate)) {
+      setHasSubmissionError(true);
+      setStatus(weekendBookingError);
+      return;
+    }
+
     setFieldErrors({});
     setHasSubmissionError(false);
     setStatus("Creating your booking...");
@@ -173,6 +182,7 @@ export default function BookingForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           slotId,
+          isEvent: isSelectedEvent,
           serviceId: selectedServiceId || "onco-nurse-consultation",
           serviceName,
           customer: {
@@ -184,7 +194,7 @@ export default function BookingForm({
           pathway: selectedService?.category || (isSelectedEvent ? "Upcoming Event" : "Consultation"),
           germanLevel: form.get("germanLevel"),
           nursingBackground: form.get("nursingBackground"),
-          bookingDate: form.get("bookingDate") || bookingDate || "Date to be announced",
+          bookingDate: submittedBookingDate,
           bookingTime: form.get("bookingTime") || bookingTime || "Time to be announced",
           scheduleStatus,
           notes: form.get("notes"),
@@ -322,7 +332,10 @@ export default function BookingForm({
             {isSelectedEvent ? (
               <><input type="hidden" name="bookingDate" value={bookingDate || "Date to be announced"} /><div className="input mt-2 flex items-center bg-slate-50 text-slate-700">{showDate(bookingDate)}</div></>
             ) : (
-              <input name="bookingDate" type="date" className="input mt-2" value={dateInputValue(bookingDate)} onChange={(e) => setBookingDate(e.target.value)} required />
+              <>
+                <input name="bookingDate" type="date" className="input mt-2" value={dateInputValue(bookingDate)} onChange={(e) => setBookingDate(e.target.value)} required />
+                <p className="mt-2 text-xs text-slate-500">Appointments are available on Saturdays and Sundays only.</p>
+              </>
             )}
           </div>
 
