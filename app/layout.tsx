@@ -22,7 +22,7 @@ function Header({ social }: { social: SedifexSocialSettings | null }) {
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-4">
+      <div className="relative mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-3 md:py-4">
         <Link href="/" className="flex items-center gap-3">
           {profile?.logoUrl ? (
             <Image
@@ -48,7 +48,48 @@ function Header({ social }: { social: SedifexSocialSettings | null }) {
           </div>
         </Link>
 
-        <nav className="flex flex-wrap items-center gap-4 text-sm font-semibold text-slate-700 md:gap-6">
+        <details className="group w-auto md:hidden">
+          <summary
+            className="flex h-11 w-11 cursor-pointer list-none flex-col items-center justify-center gap-1.5 rounded-full border border-slate-300 text-slate-800 shadow-sm marker:hidden hover:bg-slate-50 [&::-webkit-details-marker]:hidden"
+            aria-label="Open navigation menu"
+          >
+            <span className="h-0.5 w-5 rounded-full bg-current transition group-open:translate-y-2 group-open:rotate-45" />
+            <span className="h-0.5 w-5 rounded-full bg-current transition group-open:opacity-0" />
+            <span className="h-0.5 w-5 rounded-full bg-current transition group-open:-translate-y-2 group-open:-rotate-45" />
+          </summary>
+
+          <div className="absolute left-0 right-0 top-full border-b border-slate-200 bg-white px-5 py-5 shadow-xl">
+            <nav className="grid gap-4 text-base font-semibold text-slate-700">
+              <Link href="/">Home</Link>
+              <Link href="/services">Services</Link>
+              <Link href="/blog">Blog</Link>
+              <Link href="/events">Upcoming Events</Link>
+              <Link href="/faq">FAQ</Link>
+              <Link href="/about">About</Link>
+              <Link href="/contact">Contact</Link>
+            </nav>
+
+            <div className="mt-5 grid gap-3">
+              <a
+                href={site.mailingListUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-full border border-emerald-700 px-5 py-3 text-center text-sm font-bold text-emerald-700 shadow-sm hover:bg-emerald-50"
+              >
+                Join Mailing List
+              </a>
+
+              <Link
+                href="/book"
+                className="rounded-full bg-emerald-700 px-5 py-3 text-center text-sm font-bold text-white shadow-sm hover:bg-emerald-800"
+              >
+                Book Consultation
+              </Link>
+            </div>
+          </div>
+        </details>
+
+        <nav className="hidden items-center gap-6 text-sm font-semibold text-slate-700 md:flex">
           <Link href="/">Home</Link>
           <Link href="/services">Services</Link>
           <Link href="/blog">Blog</Link>
@@ -58,7 +99,7 @@ function Header({ social }: { social: SedifexSocialSettings | null }) {
           <Link href="/contact">Contact</Link>
         </nav>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="hidden items-center gap-3 lg:flex">
           <a
             href={site.mailingListUrl}
             target="_blank"
