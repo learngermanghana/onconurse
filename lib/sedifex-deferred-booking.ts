@@ -4,6 +4,7 @@ const DEFAULT_SEDIFEX_API_BASE_URL =
   "https://us-central1-sedifex-web.cloudfunctions.net";
 
 type DeferredBookingCheckoutInput = SedifexBookingInput & {
+  slotId?: string;
   currency?: string;
   returnUrl: string;
 };
@@ -127,6 +128,7 @@ export async function createDeferredSedifexBookingCheckout(
         sourceChannel,
         sourceLabel,
         bookingIntent: {
+          slotId: input.slotId,
           serviceId: input.serviceId,
           serviceName: input.serviceName,
           bookingDate: input.bookingDate,
