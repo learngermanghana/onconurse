@@ -6,10 +6,10 @@ import {
 } from "../../../lib/booking-validation";
 import {
   createSedifexBooking,
-  createSedifexBookingCheckout,
   getSedifexCheckoutReturnUrl,
   type SedifexBookingInput,
 } from "../../../lib/sedifex";
+import { createDeferredSedifexBookingCheckout } from "../../../lib/sedifex-deferred-booking";
 
 export const dynamic = "force-dynamic";
 
@@ -157,7 +157,9 @@ export async function POST(request: Request) {
       });
     }
 
-    const result = await createSedifexBookingCheckout({
+    // Paid bookings are now checkout-first. Sedifex receives the booking intent,
+    // but creates the client and booking only after Paystack confirms payment.
+    const result = await createDeferredSedifexBookingCheckout({
       ...baseInput,
       paymentMethod: "paystack_checkout",
       returnUrl: getSedifexCheckoutReturnUrl(successUrl),
