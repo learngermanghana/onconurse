@@ -1,4 +1,3 @@
-import { unstable_cache } from "next/cache";
 import { fallbackBlogPosts } from "./site";
 import {
   sanitizeSedifexHtml,
@@ -145,22 +144,13 @@ async function loadBlogPosts(): Promise<SedifexBlogPost[]> {
   }
 }
 
-const getCachedBlogPosts = unstable_cache(
-  loadBlogPosts,
-  ["onconurse-public-blog-v3", SEDIFEX_STORE_ID],
-  {
-    revalidate: BLOG_REVALIDATE_SECONDS,
-    tags: ["onconurse-blog"],
-  }
-);
-
 export async function getSedifexBlogPosts(): Promise<SedifexBlogPost[]> {
-  return getCachedBlogPosts();
+  return loadBlogPosts();
 }
 
 export async function getSedifexBlogPost(slug: string): Promise<SedifexBlogPost | null> {
   const normalizedSlug = decodeURIComponent(slug).trim();
-  const posts = await getCachedBlogPosts();
+  const posts = await loadBlogPosts();
 
   return (
     posts.find(
