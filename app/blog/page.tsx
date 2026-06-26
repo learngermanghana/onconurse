@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { getSedifexBlogPosts } from "../../lib/sedifex-blog";
 
-export const revalidate = 15 * 60;
+export const revalidate = 900;
 
 function formatDisplayDate(value?: string) {
   if (!value) return "";
