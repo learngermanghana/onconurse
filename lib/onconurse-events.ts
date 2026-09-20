@@ -35,6 +35,7 @@ const SEDIFEX_API_KEY =
 
 const SEDIFEX_CONTRACT_VERSION =
   process.env.SEDIFEX_CONTRACT_VERSION || "2026-04-13";
+const EVENT_CACHE_SECONDS = 15 * 60;
 
 type JsonRecord = Record<string, unknown>;
 
@@ -227,7 +228,7 @@ async function fetchJson(attempt: EventAttempt) {
             Accept: "application/json",
           }
         : { Accept: "application/json" },
-      next: { revalidate: 30 },
+      next: { revalidate: EVENT_CACHE_SECONDS },
     });
 
     if (!response.ok) return null;

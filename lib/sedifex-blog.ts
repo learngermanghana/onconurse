@@ -8,7 +8,7 @@ import {
 export { sanitizeSedifexHtml };
 
 const ONCO_NURSE_STORE_ID = "YvRddOFEYlhYoNrwqSyHwShPioR2";
-const BLOG_REVALIDATE_SECONDS = 15 * 60;
+const BLOG_REVALIDATE_SECONDS = 3 * 60 * 60;
 
 const SEDIFEX_PUBLIC_API_BASE_URL =
   process.env.SEDIFEX_PUBLIC_API_BASE_URL ||

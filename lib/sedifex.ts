@@ -597,7 +597,7 @@ export async function getSedifexHeroSlides(): Promise<SedifexHeroSlide[]> {
   const payload = await sedifexGet<{ slides?: SedifexHeroSlide[] }>(
     "/v1IntegrationHeroSlides",
     { placement: "home_hero" },
-    60
+    60 * 60
   );
 
   return payload?.slides || [];
@@ -607,7 +607,7 @@ export async function getSedifexSocialSettings(): Promise<SedifexSocialSettings 
   const settings = await sedifexGet<SedifexSocialSettings>(
     "/v1IntegrationSocialSettings",
     {},
-    60
+    60 * 60
   );
   if (!settings?.profile) return settings;
 

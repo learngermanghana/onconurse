@@ -24,6 +24,7 @@ const SEDIFEX_API_KEY =
 
 const SEDIFEX_CONTRACT_VERSION =
   process.env.SEDIFEX_CONTRACT_VERSION || "2026-04-13";
+const SERVICE_CACHE_SECONDS = 60 * 60;
 
 type JsonRecord = Record<string, unknown>;
 
@@ -203,7 +204,7 @@ async function fetchIntegrationProducts() {
       "X-Sedifex-Contract-Version": SEDIFEX_CONTRACT_VERSION,
       Accept: "application/json",
     },
-    next: { revalidate: 30 },
+    next: { revalidate: SERVICE_CACHE_SECONDS },
   });
 
   if (!response.ok) return [];
@@ -236,7 +237,7 @@ async function fetchPublicQuickPayCatalog() {
 
   const response = await fetch(endpoint, {
     headers: { Accept: "application/json" },
-    next: { revalidate: 30 },
+    next: { revalidate: SERVICE_CACHE_SECONDS },
   });
 
   if (!response.ok) return [];
