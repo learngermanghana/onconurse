@@ -54,6 +54,8 @@ const SEDIFEX_API_KEY =
   "";
 
 const SEDIFEX_CONTRACT_VERSION = process.env.SEDIFEX_CONTRACT_VERSION || "2026-04-13";
+const SERVICE_CACHE_SECONDS = 60 * 60;
+const EVENT_CACHE_SECONDS = 15 * 60;
 
 type SedifexRecord = Record<string, unknown>;
 type ContentKind = "services" | "catalog" | "blog" | "events" | "promo";
@@ -322,11 +324,11 @@ function extractServices(payload: unknown, kind: ContentKind): SedifexService[] 
 
 export async function getSedifexServices(): Promise<SedifexService[]> {
   const attempts: Attempt[] = [
-    { baseUrl: SEDIFEX_BASE_URL, path: "/v1IntegrationServices", params: { storeId: SEDIFEX_STORE_ID }, authenticated: true, kind: "services", revalidate: 30 },
-    { baseUrl: SEDIFEX_BASE_URL, path: "/v1IntegrationProducts", params: { storeId: SEDIFEX_STORE_ID }, authenticated: true, kind: "catalog", revalidate: 30 },
-    { baseUrl: SEDIFEX_BASE_URL, path: "/publicQuickPayCatalog", params: { storeId: SEDIFEX_STORE_ID }, kind: "catalog", revalidate: 30 },
-    { baseUrl: SEDIFEX_PUBLIC_API_BASE_URL, path: "/api/public/services", params: { storeSlug: SEDIFEX_STORE_SLUG, storeId: SEDIFEX_STORE_ID }, kind: "services", revalidate: 30 },
-    { baseUrl: SEDIFEX_PUBLIC_API_BASE_URL, path: "/api/public/catalog", params: { storeSlug: SEDIFEX_STORE_SLUG, storeId: SEDIFEX_STORE_ID }, kind: "catalog", revalidate: 30 },
+    { baseUrl: SEDIFEX_BASE_URL, path: "/v1IntegrationServices", params: { storeId: SEDIFEX_STORE_ID }, authenticated: true, kind: "services", revalidate: SERVICE_CACHE_SECONDS },
+    { baseUrl: SEDIFEX_BASE_URL, path: "/v1IntegrationProducts", params: { storeId: SEDIFEX_STORE_ID }, authenticated: true, kind: "catalog", revalidate: SERVICE_CACHE_SECONDS },
+    { baseUrl: SEDIFEX_BASE_URL, path: "/publicQuickPayCatalog", params: { storeId: SEDIFEX_STORE_ID }, kind: "catalog", revalidate: SERVICE_CACHE_SECONDS },
+    { baseUrl: SEDIFEX_PUBLIC_API_BASE_URL, path: "/api/public/services", params: { storeSlug: SEDIFEX_STORE_SLUG, storeId: SEDIFEX_STORE_ID }, kind: "services", revalidate: SERVICE_CACHE_SECONDS },
+    { baseUrl: SEDIFEX_PUBLIC_API_BASE_URL, path: "/api/public/catalog", params: { storeSlug: SEDIFEX_STORE_SLUG, storeId: SEDIFEX_STORE_ID }, kind: "catalog", revalidate: SERVICE_CACHE_SECONDS },
   ];
 
   for (const attempt of attempts) {
@@ -585,17 +587,17 @@ function extractEvents(payload: unknown, kind: ContentKind): SedifexEvent[] {
 
 export async function getSedifexEvents(): Promise<SedifexEvent[]> {
   const attempts: Attempt[] = [
-    { baseUrl: SEDIFEX_PUBLIC_API_BASE_URL, path: "/api/public/events", params: { storeSlug: SEDIFEX_STORE_SLUG, storeId: SEDIFEX_STORE_ID }, kind: "events" },
-    { baseUrl: SEDIFEX_PUBLIC_API_BASE_URL, path: "/api/public/availability", params: { storeSlug: SEDIFEX_STORE_SLUG, storeId: SEDIFEX_STORE_ID }, kind: "events" },
-    { baseUrl: SEDIFEX_BASE_URL, path: "/v1IntegrationAvailability", params: { storeId: SEDIFEX_STORE_ID }, authenticated: true, kind: "events" },
-    { baseUrl: SEDIFEX_BASE_URL, path: "/v1IntegrationAvailabilities", params: { storeId: SEDIFEX_STORE_ID }, authenticated: true, kind: "events" },
-    { baseUrl: SEDIFEX_BASE_URL, path: "/v1IntegrationAvailableSlots", params: { storeId: SEDIFEX_STORE_ID }, authenticated: true, kind: "events" },
-    { baseUrl: SEDIFEX_BASE_URL, path: "/publicAvailability", params: { storeId: SEDIFEX_STORE_ID }, kind: "events" },
-    { baseUrl: SEDIFEX_BASE_URL, path: "/publicAvailabilities", params: { storeId: SEDIFEX_STORE_ID }, kind: "events" },
-    { baseUrl: SEDIFEX_BASE_URL, path: "/publicAvailableSlots", params: { storeId: SEDIFEX_STORE_ID }, kind: "events" },
-    { baseUrl: SEDIFEX_BASE_URL, path: "/v1IntegrationEvents", params: { storeId: SEDIFEX_STORE_ID }, authenticated: true, kind: "events" },
-    { baseUrl: SEDIFEX_BASE_URL, path: "/v1IntegrationUpcomingEvents", params: { storeId: SEDIFEX_STORE_ID }, authenticated: true, kind: "events" },
-    { baseUrl: SEDIFEX_BASE_URL, path: "/v1IntegrationPromo", params: { storeId: SEDIFEX_STORE_ID }, authenticated: true, kind: "promo" },
+    { baseUrl: SEDIFEX_PUBLIC_API_BASE_URL, path: "/api/public/events", params: { storeSlug: SEDIFEX_STORE_SLUG, storeId: SEDIFEX_STORE_ID }, kind: "events", revalidate: EVENT_CACHE_SECONDS },
+    { baseUrl: SEDIFEX_PUBLIC_API_BASE_URL, path: "/api/public/availability", params: { storeSlug: SEDIFEX_STORE_SLUG, storeId: SEDIFEX_STORE_ID }, kind: "events", revalidate: EVENT_CACHE_SECONDS },
+    { baseUrl: SEDIFEX_BASE_URL, path: "/v1IntegrationAvailability", params: { storeId: SEDIFEX_STORE_ID }, authenticated: true, kind: "events", revalidate: EVENT_CACHE_SECONDS },
+    { baseUrl: SEDIFEX_BASE_URL, path: "/v1IntegrationAvailabilities", params: { storeId: SEDIFEX_STORE_ID }, authenticated: true, kind: "events", revalidate: EVENT_CACHE_SECONDS },
+    { baseUrl: SEDIFEX_BASE_URL, path: "/v1IntegrationAvailableSlots", params: { storeId: SEDIFEX_STORE_ID }, authenticated: true, kind: "events", revalidate: EVENT_CACHE_SECONDS },
+    { baseUrl: SEDIFEX_BASE_URL, path: "/publicAvailability", params: { storeId: SEDIFEX_STORE_ID }, kind: "events", revalidate: EVENT_CACHE_SECONDS },
+    { baseUrl: SEDIFEX_BASE_URL, path: "/publicAvailabilities", params: { storeId: SEDIFEX_STORE_ID }, kind: "events", revalidate: EVENT_CACHE_SECONDS },
+    { baseUrl: SEDIFEX_BASE_URL, path: "/publicAvailableSlots", params: { storeId: SEDIFEX_STORE_ID }, kind: "events", revalidate: EVENT_CACHE_SECONDS },
+    { baseUrl: SEDIFEX_BASE_URL, path: "/v1IntegrationEvents", params: { storeId: SEDIFEX_STORE_ID }, authenticated: true, kind: "events", revalidate: EVENT_CACHE_SECONDS },
+    { baseUrl: SEDIFEX_BASE_URL, path: "/v1IntegrationUpcomingEvents", params: { storeId: SEDIFEX_STORE_ID }, authenticated: true, kind: "events", revalidate: EVENT_CACHE_SECONDS },
+    { baseUrl: SEDIFEX_BASE_URL, path: "/v1IntegrationPromo", params: { storeId: SEDIFEX_STORE_ID }, authenticated: true, kind: "promo", revalidate: EVENT_CACHE_SECONDS },
   ];
 
   for (const attempt of attempts) {
