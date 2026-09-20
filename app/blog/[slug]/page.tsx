@@ -8,8 +8,7 @@ import {
   sanitizeSedifexHtml,
 } from "../../../lib/sedifex-blog";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 3 * 60 * 60;
 
 function formatDisplayDate(value?: string) {
   if (!value) return "";
